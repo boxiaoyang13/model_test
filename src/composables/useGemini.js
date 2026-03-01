@@ -14,15 +14,24 @@ export function useGemini() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
+      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-goog-api-key': apiKey
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: payload.prompt }] }]
+          contents: [{
+            role: 'user',
+            parts: [{ text: payload.prompt }]
+          }],
+          generationConfig: {
+            temperature: payload.temperature || 0.7,
+            maxOutputTokens: payload.maxTokens || 1024
+          }
         })
       })
 
@@ -59,15 +68,24 @@ export function useGemini() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/models/${model}:streamGenerateContent?key=${apiKey}`
+      const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent`
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-goog-api-key': apiKey
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: payload.prompt }] }]
+          contents: [{
+            role: 'user',
+            parts: [{ text: payload.prompt }]
+          }],
+          generationConfig: {
+            temperature: payload.temperature || 0.7,
+            maxOutputTokens: payload.maxTokens || 1024
+          }
         })
       })
 
@@ -80,18 +98,51 @@ export function useGemini() {
       const duration = Date.now() - startTime
       const chunks = []
       const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let hasContent = false
+      let buffer = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        chunks.push(value)
+
+        const chunk = decoder.decode(value, { stream: true })
+        buffer += chunk
+
+        // Process SSE format (data: {...})
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (trimmed.startsWith('data:')) {
+            const jsonStr = trimmed.slice(5).trim()
+            if (jsonStr && jsonStr !== '[DONE]') {
+              try {
+                const data = JSON.parse(jsonStr)
+                chunks.push(data)
+                // Check if there's actual content in the response
+                if (data.candidates && data.candidates[0]?.content?.parts) {
+                  hasContent = true
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
       }
 
       state.response = {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
-        data: { chunks, chunkCount: chunks.length },
+        data: {
+          chunks,
+          chunkCount: chunks.length,
+          hasContent,
+          isSSE: true
+        },
         duration
       }
 
@@ -111,13 +162,24 @@ export function useGemini() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
+      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: payload.prompt }] }]
+          contents: [{
+            role: 'user',
+            parts: [{ text: payload.prompt }]
+          }],
+          generationConfig: {
+            temperature: payload.temperature || 0.7,
+            maxOutputTokens: payload.maxTokens || 1024
+          }
         })
       })
 
@@ -154,14 +216,25 @@ export function useGemini() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
+      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: payload.prompt }] }],
-          tools: [{ functionDeclarations: payload.functions || [] }]
+          contents: [{
+            role: 'user',
+            parts: [{ text: payload.prompt }]
+          }],
+          tools: [{ functionDeclarations: payload.functions || [] }],
+          generationConfig: {
+            temperature: payload.temperature || 0.7,
+            maxOutputTokens: payload.maxTokens || 1024
+          }
         })
       })
 
@@ -198,14 +271,23 @@ export function useGemini() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
+      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: payload.prompt }] }],
+          contents: [{
+            role: 'user',
+            parts: [{ text: payload.prompt }]
+          }],
           generationConfig: {
+            temperature: payload.temperature || 0.7,
+            maxOutputTokens: payload.maxTokens || 1024,
             responseMimeType: 'application/json',
             responseSchema: payload.schema
           }
@@ -245,11 +327,15 @@ export function useGemini() {
 
     try {
       const { baseUrl, apiKey } = config
-      const url = `${baseUrl}/models/embedding-001:embedContent?key=${apiKey}`
+      const url = `${baseUrl}/v1beta/models/embedding-001:embedContent`
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
           content: { parts: [{ text: payload.prompt }] }
         })
@@ -288,18 +374,27 @@ export function useGemini() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
+      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
           contents: [{
+            role: 'user',
             parts: [
               { text: payload.prompt || 'Describe this image' },
               { inline_data: { mime_type: payload.imageType, data: payload.imageData } }
             ]
-          }]
+          }],
+          generationConfig: {
+            temperature: payload.temperature || 0.7,
+            maxOutputTokens: payload.maxTokens || 1024
+          }
         })
       })
 
@@ -336,15 +431,26 @@ export function useGemini() {
     const results = []
 
     try {
-      for (const payload of payloads) {
-        const { baseUrl, apiKey, model } = config
-        const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
+      const { baseUrl, apiKey, model } = config
+      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
+      for (const payload of payloads) {
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'x-goog-api-key': apiKey
+          },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: payload.prompt }] }]
+            contents: [{
+              role: 'user',
+              parts: [{ text: payload.prompt }]
+            }],
+            generationConfig: {
+              temperature: payload.temperature || 0.7,
+              maxOutputTokens: payload.maxTokens || 1024
+            }
           })
         })
 

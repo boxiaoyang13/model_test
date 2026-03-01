@@ -51,15 +51,44 @@ export function useTestRunner(apiMethods) {
       try {
         const testConfig = { ...config, model }
         const payload = {
-          prompt: 'Hello, please respond with a greeting.',
-          maxTokens: config.maxTokens || 1024
+          prompt: '你好，给我科普一下量子力学吧',
+          maxTokens: config.maxTokens || 1024,
+          temperature: 0.7
         }
 
         const result = await method(testConfig, payload)
 
-        if (result.status >= 200 && result.status < 300) {
+        // Check if streaming test passed (SSE + hasContent)
+        if (testType === 'chat-stream') {
+          if (result.data?.isSSE && result.data?.hasContent) {
+            addLog('success', testType.toUpperCase(),
+              `SSE stream successful. ${result.data.chunkCount} chunks received with content in ${result.duration}ms`,
+              model
+            )
+          } else {
+            addLog('error', testType.toUpperCase(),
+              `SSE stream failed: ${result.data?.isSSE ? 'SSE' : 'Not SSE'}, ${result.data?.hasContent ? 'Has content' : 'No content'}`,
+              model
+            )
+          }
+        } else if (result.status >= 200 && result.status < 300) {
+          // Parse response data for better logging
+          let dataSummary = ''
+          if (result.data) {
+            if (result.data.candidates) {
+              const content = result.data.candidates[0]?.content?.parts[0]?.text
+              if (content) {
+                dataSummary = `Content: "${content.slice(0, 80)}${content.length > 80 ? '...' : ''}"`
+              } else {
+                dataSummary = JSON.stringify(result.data).slice(0, 100)
+              }
+            } else {
+              dataSummary = JSON.stringify(result.data).slice(0, 100)
+            }
+          }
+
           addLog('success', testType.toUpperCase(),
-            `Response received in ${result.duration}ms. ${JSON.stringify(result.data).slice(0, 100)}...`,
+            `Response received in ${result.duration}ms. ${dataSummary}`,
             model
           )
         } else {
