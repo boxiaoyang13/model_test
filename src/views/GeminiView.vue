@@ -16,7 +16,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import ConfigPanel from '@/components/ConfigPanel.vue'
 import TestPanel from '@/components/TestPanel.vue'
 import LogPanel from '@/components/LogPanel.vue'

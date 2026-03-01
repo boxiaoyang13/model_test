@@ -1,7 +1,8 @@
 <template>
   <div class="view-container">
     <div class="view-header">
-      <h1 class="view-title">OpenAI API Tester</h1>
+      <h1 class="view-title">OpenAI</h1>
+      <p class="view-subtitle">OpenAI API</p>
     </div>
     <div class="view-content">
       <ConfigPanel :config="config" @update="updateConfig" />
@@ -20,13 +21,15 @@ import { ref } from 'vue'
 import ConfigPanel from '@/components/ConfigPanel.vue'
 import TestPanel from '@/components/TestPanel.vue'
 import LogPanel from '@/components/LogPanel.vue'
+import openaiConfig from '@/config/openai.js'
 import { useOpenAI } from '@/composables/useOpenAI'
 import { useTestRunner } from '@/composables/useTestRunner'
 
 const config = ref({
-  baseUrl: 'https://api.openai.com',
+  baseUrl: openaiConfig.baseUrl,
   apiKey: '',
-  model: 'gpt-4o'
+  model: 'gpt-4o',
+  models: openaiConfig.models
 })
 
 const updateConfig = (newConfig) => {
@@ -54,6 +57,12 @@ const { isLoading, logs, canTest, runTest } = useTestRunner(openai, config)
   font-size: 24px;
   font-weight: 600;
   color: var(--text);
+  margin: 0 0 4px 0;
+}
+
+.view-subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
   margin: 0;
 }
 
