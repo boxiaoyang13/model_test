@@ -50,6 +50,8 @@
           :logs="testRunner.logs.value || []"
           :logCount="testRunner.logCount.value || 0"
           :activeTab="activeTab"
+          :apiKey="config.apiKey"
+          :downloadVideo="gemini.downloadVideo"
           @clear="handleClearLogs"
         />
       </div>

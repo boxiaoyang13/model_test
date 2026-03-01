@@ -333,4 +333,7 @@ curl https://gateway.theturbo.ai/v1beta/models/veo-3.0-fast-generate-001/operati
 }
 成功后下载视频，并提供视频预览窗口，点击开始按钮，可以正常播放。
 
+下载也是需要的 加 x-goog-api-key 的。
+curl -L -o dialogue_example.mp4 -H "x-goog-api-key: $YOUR_API_KEY" "https://gateway.theturbo.ai/v1beta/files/f5uy0kdfz4mc:download?alt=media"
+
 

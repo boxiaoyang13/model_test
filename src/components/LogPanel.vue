@@ -59,7 +59,15 @@
                 <div class="video-preview" v-if="!isVideoExpanded">
                   <div class="video-placeholder" @click="expandVideo(log.content)">
                     <span class="video-icon">🎬</span>
-                    <p class="video-hint">Click to play video</p>
+                    <p class="video-hint">Click to preview</p>
+                    <button
+                      v-if="apiKey && downloadVideo"
+                      class="download-video-btn"
+                      @click.stop="handleDownloadVideo(log.content)"
+                    >
+                      <span class="download-icon">⬇</span>
+                      Download
+                    </button>
                   </div>
                 </div>
               </div>
@@ -81,11 +89,13 @@
       <div v-if="expandedVideo" class="video-modal" @click="closeVideoModal">
         <div class="video-modal-content" @click.stop>
           <video
-            :src="expandedVideo"
+            v-if="videoBlobUrl"
+            :src="videoBlobUrl"
             class="expanded-video"
             controls
             autoplay
           ></video>
+          <div v-else class="video-loading">Loading video...</div>
           <button class="close-modal-btn" @click="closeVideoModal">✕</button>
         </div>
       </div>
@@ -109,6 +119,14 @@ const props = defineProps({
   activeTab: {
     type: String,
     default: 'text'
+  },
+  apiKey: {
+    type: String,
+    default: ''
+  },
+  downloadVideo: {
+    type: Function,
+    default: null
   }
 })
 
@@ -118,6 +136,7 @@ const logBodyRef = ref(null)
 const expandedImage = ref(null)
 const expandedVideo = ref(null)
 const isVideoExpanded = ref(false)
+const videoBlobUrl = ref(null)
 
 // Handle clear button click
 const handleClear = () => {
@@ -222,15 +241,55 @@ const closeImageModal = () => {
 }
 
 // Expand video to modal
-const expandVideo = (videoUrl) => {
+const expandVideo = async (videoUrl) => {
   expandedVideo.value = videoUrl
   isVideoExpanded.value = true
+  videoBlobUrl.value = null
+
+  // Download video for preview if API key is available
+  if (props.apiKey) {
+    try {
+      const response = await fetch(videoUrl, {
+        method: 'GET',
+        headers: {
+          'x-goog-api-key': props.apiKey
+        }
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        videoBlobUrl.value = window.URL.createObjectURL(blob)
+      } else {
+        throw new Error(`HTTP ${response.status}`)
+      }
+    } catch (err) {
+      console.error('Failed to load video for preview:', err)
+      alert(`Failed to load video for preview: ${err.message}`)
+    }
+  }
 }
 
 // Close video modal
 const closeVideoModal = () => {
+  // Revoke blob URL to free memory
+  if (videoBlobUrl.value) {
+    window.URL.revokeObjectURL(videoBlobUrl.value)
+    videoBlobUrl.value = null
+  }
   expandedVideo.value = null
   isVideoExpanded.value = false
+}
+
+// Handle download video
+const handleDownloadVideo = async (videoUrl) => {
+  if (!props.downloadVideo || !props.apiKey) return
+
+  try {
+    await props.downloadVideo(videoUrl, props.apiKey)
+  } catch (err) {
+    console.error('Failed to download video:', err)
+    alert(`Failed to download video: ${err.message}`)
+  }
 }
 
 // Auto-scroll to bottom when new logs are added
@@ -611,6 +670,36 @@ watch(() => props.logs, () => {
   font-style: italic;
 }
 
+.download-video-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--accent-active);
+  border: none;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--bg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.download-video-btn:hover {
+  background: var(--accent-gemini);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--glow-blue);
+}
+
+.download-video-btn:active {
+  transform: translateY(0);
+}
+
+.download-icon {
+  font-size: 14px;
+}
+
 /* Video Modal */
 .video-modal {
   position: fixed;
@@ -637,6 +726,16 @@ watch(() => props.logs, () => {
   max-width: 90vw;
   max-height: 90vh;
   border-radius: 8px;
+}
+
+.video-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
 }
 
 /* Responsive adjustments */

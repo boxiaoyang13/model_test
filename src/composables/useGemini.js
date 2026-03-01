@@ -507,6 +507,43 @@ export function useGemini() {
     }
   }
 
+  const downloadVideo = async (videoUrl, apiKey) => {
+    state.loading = true
+    state.error = null
+
+    try {
+      const response = await fetch(videoUrl, {
+        method: 'GET',
+        headers: {
+          'x-goog-api-key': apiKey
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to download video: HTTP ${response.status}`)
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+
+      // Create download link
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `generated-video-${Date.now()}.mp4`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      return { success: true }
+    } catch (err) {
+      state.error = err
+      throw err
+    } finally {
+      state.loading = false
+    }
+  }
+
   return {
     state,
     sendChat,
@@ -515,5 +552,6 @@ export function useGemini() {
     runFunctionCall,
     sendImageGen,
     sendVideoGen,
+    downloadVideo,
   }
 }
