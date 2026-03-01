@@ -49,6 +49,7 @@ export function useGemini() {
   const sendChatStream = async (config, payload) => {
     // Streaming implementation
     state.loading = true
+    state.error = null
     const startTime = Date.now()
 
     try {
@@ -78,6 +79,7 @@ export function useGemini() {
       state.response = {
         status: response.status,
         statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
         data: { chunks, chunkCount: chunks.length },
         duration
       }
@@ -98,6 +100,7 @@ export function useGemini() {
 
   const runFunctionCall = async (config, payload) => {
     state.loading = true
+    state.error = null
     const startTime = Date.now()
 
     try {
@@ -119,11 +122,15 @@ export function useGemini() {
       state.response = {
         status: response.status,
         statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
         data,
         duration
       }
 
       return state.response
+    } catch (err) {
+      state.error = err
+      throw err
     } finally {
       state.loading = false
     }
@@ -131,6 +138,7 @@ export function useGemini() {
 
   const runStructured = async (config, payload) => {
     state.loading = true
+    state.error = null
     const startTime = Date.now()
 
     try {
@@ -155,11 +163,15 @@ export function useGemini() {
       state.response = {
         status: response.status,
         statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
         data,
         duration
       }
 
       return state.response
+    } catch (err) {
+      state.error = err
+      throw err
     } finally {
       state.loading = false
     }
@@ -167,6 +179,7 @@ export function useGemini() {
 
   const runEmbedding = async (config, payload) => {
     state.loading = true
+    state.error = null
     const startTime = Date.now()
 
     try {
@@ -187,11 +200,15 @@ export function useGemini() {
       state.response = {
         status: response.status,
         statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
         data,
         duration
       }
 
       return state.response
+    } catch (err) {
+      state.error = err
+      throw err
     } finally {
       state.loading = false
     }
@@ -199,6 +216,7 @@ export function useGemini() {
 
   const runMultimodal = async (config, payload) => {
     state.loading = true
+    state.error = null
     const startTime = Date.now()
 
     try {
@@ -224,11 +242,15 @@ export function useGemini() {
       state.response = {
         status: response.status,
         statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
         data,
         duration
       }
 
       return state.response
+    } catch (err) {
+      state.error = err
+      throw err
     } finally {
       state.loading = false
     }
@@ -236,6 +258,7 @@ export function useGemini() {
 
   const runBatch = async (config, payloads) => {
     state.loading = true
+    state.error = null
     const startTime = Date.now()
     const results = []
 
@@ -250,11 +273,15 @@ export function useGemini() {
       state.response = {
         status: 207,
         statusText: 'Multi-Status',
+        headers: {},
         data: { results, count: results.length },
         duration
       }
 
       return state.response
+    } catch (err) {
+      state.error = err
+      throw err
     } finally {
       state.loading = false
     }
