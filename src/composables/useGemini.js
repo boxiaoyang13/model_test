@@ -13,16 +13,23 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model } = config
+      const { baseUrl, apiKey, model, vendor } = config
       const url = `${baseUrl}/v1beta/models/${model}:generateContent`
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'x-goog-api-key': apiKey
+      }
+
+      // Add vendor header if provided
+      if (vendor) {
+        headers['X-Zenlayer-Vendor'] = vendor
+      }
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-goog-api-key': apiKey
-        },
+        headers,
         body: JSON.stringify({
           contents: [{
             role: 'user',
@@ -67,16 +74,23 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model } = config
+      const { baseUrl, apiKey, model, vendor } = config
       const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent`
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'x-goog-api-key': apiKey
+      }
+
+      // Add vendor header if provided
+      if (vendor) {
+        headers['X-Zenlayer-Vendor'] = vendor
+      }
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-goog-api-key': apiKey
-        },
+        headers,
         body: JSON.stringify({
           contents: [{
             role: 'user',
@@ -161,24 +175,33 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model } = config
+      const { baseUrl, apiKey, model, vendor } = config
       const url = `${baseUrl}/v1beta/models/${model}:generateContent`
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'x-goog-api-key': apiKey
+      }
+
+      // Add vendor header if provided
+      if (vendor) {
+        headers['X-Zenlayer-Vendor'] = vendor
+      }
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-goog-api-key': apiKey
-        },
+        headers,
         body: JSON.stringify({
           contents: [{
-            role: 'user',
             parts: [{ text: payload.prompt }]
           }],
           generationConfig: {
             temperature: payload.temperature || 0.7,
-            maxOutputTokens: payload.maxTokens || 1024
+            maxOutputTokens: payload.maxTokens || 1024,
+            thinkingConfig: {
+              thinkingLevel: 'high'
+            }
           }
         })
       })
@@ -215,261 +238,83 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model } = config
+      const { baseUrl, apiKey, model, vendor } = config
       const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [{ text: payload.prompt }]
-          }],
-          tools: [{ functionDeclarations: payload.functions || [] }],
-          generationConfig: {
-            temperature: payload.temperature || 0.7,
-            maxOutputTokens: payload.maxTokens || 1024
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'x-goog-api-key': apiKey
+      }
+
+      // Add vendor header if provided
+      if (vendor) {
+        headers['X-Zenlayer-Vendor'] = vendor
+      }
+
+      // Define function declarations for scheduling meeting
+      const functionDeclarations = [
+        {
+          name: 'schedule_meeting',
+          description: 'Schedules a meeting with specified attendees at a given time and date.',
+          parameters: {
+            type: 'object',
+            properties: {
+              attendees: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'List of people attending the meeting.'
+              },
+              date: {
+                type: 'string',
+                description: "Date of the meeting (e.g., '2024-07-29')"
+              },
+              time: {
+                type: 'string',
+                description: "Time of the meeting (e.g., '15:00')"
+              },
+              topic: {
+                type: 'string',
+                description: 'The subject or topic of the meeting.'
+              }
+            },
+            required: ['attendees', 'date', 'time', 'topic']
           }
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
-      return state.response
-    } catch (err) {
-      state.error = err
-      throw err
-    } finally {
-      state.loading = false
-    }
-  }
-
-  const runStructured = async (config, payload) => {
-    state.loading = true
-    state.error = null
-    const startTime = Date.now()
-
-    try {
-      const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [{ text: payload.prompt }]
-          }],
-          generationConfig: {
-            temperature: payload.temperature || 0.7,
-            maxOutputTokens: payload.maxTokens || 1024,
-            responseMimeType: 'application/json',
-            responseSchema: payload.schema
-          }
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
-      return state.response
-    } catch (err) {
-      state.error = err
-      throw err
-    } finally {
-      state.loading = false
-    }
-  }
-
-  const runEmbedding = async (config, payload) => {
-    state.loading = true
-    state.error = null
-    const startTime = Date.now()
-
-    try {
-      const { baseUrl, apiKey } = config
-      const url = `${baseUrl}/v1beta/models/embedding-001:embedContent`
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          content: { parts: [{ text: payload.prompt }] }
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
-      return state.response
-    } catch (err) {
-      state.error = err
-      throw err
-    } finally {
-      state.loading = false
-    }
-  }
-
-  const runMultimodal = async (config, payload) => {
-    state.loading = true
-    state.error = null
-    const startTime = Date.now()
-
-    try {
-      const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [
-              { text: payload.prompt || 'Describe this image' },
-              { inline_data: { mime_type: payload.imageType, data: payload.imageData } }
-            ]
-          }],
-          generationConfig: {
-            temperature: payload.temperature || 0.7,
-            maxOutputTokens: payload.maxTokens || 1024
-          }
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
-      return state.response
-    } catch (err) {
-      state.error = err
-      throw err
-    } finally {
-      state.loading = false
-    }
-  }
-
-  const runBatch = async (config, payloads) => {
-    state.loading = true
-    state.error = null
-    const startTime = Date.now()
-    const results = []
-
-    try {
-      const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
-
-      for (const payload of payloads) {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          body: JSON.stringify({
-            contents: [{
-              role: 'user',
-              parts: [{ text: payload.prompt }]
-            }],
-            generationConfig: {
-              temperature: payload.temperature || 0.7,
-              maxOutputTokens: payload.maxTokens || 1024
-            }
-          })
-        })
-
-        if (!response.ok) {
-          const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-          throw error
         }
+      ]
 
-        const data = await response.json()
-        results.push({ status: response.status, statusText: response.statusText, data })
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [{ text: payload.prompt }]
+          }],
+          tools: [{
+            functionDeclarations
+          }],
+          generationConfig: {
+            temperature: payload.temperature || 0.7,
+            maxOutputTokens: payload.maxTokens || 1024
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+        state.error = error
+        throw error
       }
 
       const duration = Date.now() - startTime
+      const data = await response.json()
 
       state.response = {
-        status: 207,
-        statusText: 'Multi-Status',
-        headers: {},
-        data: { results, count: results.length },
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        data,
         duration
       }
 
@@ -481,6 +326,7 @@ export function useGemini() {
       state.loading = false
     }
   }
+
 
   return {
     state,
@@ -488,9 +334,5 @@ export function useGemini() {
     sendChatStream,
     runReasoning,
     runFunctionCall,
-    runStructured,
-    runEmbedding,
-    runMultimodal,
-    runBatch
   }
 }

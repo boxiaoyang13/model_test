@@ -1,8 +1,7 @@
 <template>
   <aside class="sidebar">
     <div class="sidebar-header">
-      <div class="sidebar-logo">AI Gateway</div>
-      <div class="sidebar-title">API<br>Tester</div>
+      <div class="sidebar-logo">Model Tester</div>
     </div>
 
     <div class="sidebar-label">Protocol</div>
@@ -48,8 +47,8 @@ const isActive = (id) => {
 
 <style scoped>
 .sidebar {
-  width: 220px;
-  min-width: 220px;
+  width: 150px;
+  min-width: 150px;
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
@@ -73,11 +72,11 @@ const isActive = (id) => {
 }
 
 .sidebar-logo {
-  font-family: 'Syne', sans-serif;
-  font-size: 13px;
-  font-weight: 800;
+  /* font-family: 'Syne', sans-serif; */
+  font-size: 20px;
+  font-weight: 600;
   letter-spacing: 0.15em;
-  text-transform: uppercase;
+  /* text-transform: uppercase; */
   color: var(--text-muted);
   margin-bottom: 4px;
 }

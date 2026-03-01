@@ -4,11 +4,11 @@ export default {
   sub: 'Google AI Studio',
   badge: 'gemini-protocol',
   color: '#8b5cf6',
-  baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+  baseUrl: 'https://gateway.theturbo.ai',
   models: {
-    text: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro'],
+    text: ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview'],
     image: ['imagen-3.0', 'imagen-2.0', 'gemini-vision'],
     video: ['veo-2', 'veo-1']
   },
-  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall', 'struct', 'embedding', 'multimodal', 'batch']
+  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall', 'struct']
 }

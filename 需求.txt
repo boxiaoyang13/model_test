@@ -1,0 +1,200 @@
+项目需求：开发以模型测试的web网页
+技术栈：vue Tailwind css element plus vite
+页面设计：纯html ai-api-tester.html 实现了一份，
+按照这个部分和比例开发页面（唯一需要改进的就是log 展示高度太小页面可以下拉，查看更多）
+目录设计：
+src：
+    composables：
+        gemini.js 发送 函数的封装
+        anthropic.js
+        openai.js
+    config:
+        存储页面的对用的分类的模型
+    views:
+        gemini.vue
+        anthropic.vue
+        openai.vue
+
+sk-f1v8UVMOjJ-ywJzxLvG7Tks3VEV8DGzyaO-JYTfQ25RM-7e0
+
+代码优化：
+1、gemini 发送chat的协议示例：
+
+
+     https://gateway.theturbo.ai/v1/v1beta//v1beta/models/gemini-2.0-flash:generateContent
+非流式
+curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:generateContent \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "x-goog-api-key: $YOUR_API_KEY" \
+	-d "{
+	\"contents\": [{
+		\"role\": \"user\",
+		\"parts\": [{
+			\"text\": \"你好，给我科普一下量子力学吧\"
+		}]
+	}],
+	\"generationConfig\": {
+		\"temperature\": 0.7,
+		\"maxOutputTokens\": 1024
+	}
+}"
+流式，这是下面这样的，结果如果是SSE ，且有内容，测试就通过了
+curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:streamGenerateContent \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "x-goog-api-key: $YOUR_API_KEY" \
+	-d "{
+	\"contents\": [{
+		\"role\": \"user\",
+		\"parts\": [{
+			\"text\": \"你好，给我科普一下量子力学吧\"
+		}]
+	}],
+	\"generationConfig\": {
+		\"temperature\": 0.7,
+		\"maxOutputTokens\": 1024
+	}
+}"
+
+需求优化：
+三个页面：gemini.vue anthropic.vue vopenai.vue 均有
+1、模型选择下面增加一个自定义按钮，点击自定义按钮弹出填写框，用户可以填写定义模型
+2、测试的页面，去掉在strcuct 按钮后面增加一个自定义功能，点击自定义，可以填写发送的body
+内容需要校验为json 格式。加一个红色的外框，无法点击确认。只能取消。
+3、QUICK CONFIG 删除 MaxToken 增加测试厂商。 如果填写了，增加
+headr X-Zenlayer-Vendor 填写的内容就是值
+
+
+需求优化：
+1、协议选择的目录栏有点宽，减少原来的1/3的宽度
+2、INDIVIDUAL TESTS custom 的逻辑是这样的：
+2.1、点击custom 弹出填写框，输入body ，实时检查json的格式。
+2.2、点击确认，再检查key 是否填写，组装发送内容。最后发送。
+
+代码优化：
+1、gemini 发送reasoning 测试 的协议示例：
+curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:generateContent \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "x-goog-api-key: $YOUR_API_KEY" \
+	-d '
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Provide a list of 3 famous physicists and their key contributions"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "thinkingConfig": {
+          "thinkingLevel": "low"
+    }
+  }
+}'
+回复的 
+  "usageMetadata": {
+    "promptTokenCount": 12,
+    "candidatesTokenCount": 492,
+    "totalTokenCount": 609,
+    "trafficType": "ON_DEMAND",
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 12
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 492
+      }
+    ],
+    "thoughtsTokenCount": 105
+  },
+  检查 thoughtsTokenCount 大于 0 就会成功的，否则是失败的。
+
+代码优化：
+1、gemini 发送function 测试 的协议示例：
+curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-3-flash:generateContent \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "x-goog-api-key: $YOUR_API_KEY" \
+	-d '
+
+  {
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Schedule a meeting with Bob and Alice for 03/27/2025 at 10:00 AM about the Q3 planning."
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "functionDeclarations": [
+        {
+          "name": "schedule_meeting",
+          "description": "Schedules a meeting with specified attendees at a given time and date.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "attendees": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "List of people attending the meeting."
+              },
+              "date": {
+                "type": "string",
+                "description": "Date of the meeting (e.g., '2024-07-29')"
+              },
+              "time": {
+                "type": "string",
+                "description": "Time of the meeting (e.g., '15:00')"
+              },
+              "topic": {
+                "type": "string",
+                "description": "The subject or topic of the meeting."
+              }
+            },
+            "required": [
+              "attendees",
+              "date",
+              "time",
+              "topic"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+
+ 检查  回复 是否 有 functionCall 字段，有成功，否则失败
+ {
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "functionCall": {
+              "name": "schedule_meeting",
+              "args": {
+                "topic": "Q3 planning",
+                "time": "10:00",
+                "attendees": [
+                  "Bob",
+                  "Alice"
+                ],
+                "date": "2025-03-27"
+              }
+            },

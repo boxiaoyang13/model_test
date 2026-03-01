@@ -10,5 +10,5 @@ export default {
     image: ['dall-e-3', 'dall-e-2', 'gpt-4-vision'],
     video: ['sora']
   },
-  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall', 'struct', 'embedding', 'multimodal', 'batch']
+  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall', 'struct']
 }

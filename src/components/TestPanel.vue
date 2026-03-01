@@ -53,6 +53,17 @@
           <span class="test-label">{{ test.label }}</span>
           <span v-if="currentTest === test.type" class="test-spinner"></span>
         </button>
+        <!-- Custom Test Button -->
+        <button
+          class="test-btn test-btn-custom"
+          :class="{ running: currentTest === 'custom' }"
+          :disabled="isRunning"
+          @click="openCustomDialog"
+          title="Custom JSON test"
+        >
+          <span class="test-icon">📝</span>
+          <span class="test-label">Custom</span>
+        </button>
       </div>
     </section>
 
@@ -75,24 +86,61 @@
           />
         </div>
         <div class="config-item">
-          <label class="config-label">Max Tokens</label>
+          <label class="config-label">Vendor</label>
           <input
-            :value="maxTokens"
-            type="number"
+            :value="vendor"
+            type="text"
             class="config-input"
-            min="1"
-            max="32000"
-            step="1"
-            @input="handleMaxTokensUpdate"
+            placeholder="Optional"
+            @input="handleVendorUpdate"
           />
         </div>
       </div>
     </section>
+
+    <!-- Custom JSON Test Dialog -->
+    <div v-if="showCustomDialog" class="dialog-overlay" @click.self="closeCustomDialog">
+      <div class="dialog dialog-invalid" :class="{ 'dialog-valid': isJsonValid }">
+        <div class="dialog-header">
+          <h3 class="dialog-title">Custom JSON Body</h3>
+          <button class="dialog-close" @click="closeCustomDialog">✕</button>
+        </div>
+        <div class="dialog-body">
+          <p class="dialog-hint">Enter a valid JSON object as the request body</p>
+          <textarea
+            v-model="customJson"
+            class="json-textarea"
+            :class="{ 'json-error': !isJsonValid && customJson.trim() }"
+            placeholder='{"contents": [{"role": "user", "parts": [{"text": "Hello"}]}]}'
+            @input="validateJson"
+            rows="10"
+          ></textarea>
+          <p v-if="!isJsonValid && customJson.trim()" class="json-error-text">
+            ❌ Invalid JSON format
+          </p>
+          <p v-else-if="customJson.trim()" class="json-success-text">
+            ✓ Valid JSON
+          </p>
+        </div>
+        <div class="dialog-footer">
+          <button class="dialog-btn dialog-btn-cancel" @click="closeCustomDialog">
+            Cancel
+          </button>
+          <button
+            class="dialog-btn dialog-btn-confirm"
+            :disabled="!isJsonValid || !customJson.trim()"
+            @click="runCustomTest"
+          >
+            Send Request
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   isRunning: {
@@ -111,13 +159,28 @@ const props = defineProps({
     type: Number,
     default: 30000
   },
-  maxTokens: {
-    type: Number,
-    default: 4096
+  vendor: {
+    type: String,
+    default: ''
   }
 })
 
-const emit = defineEmits(['runAll', 'runTest', 'update:timeout', 'update:maxTokens'])
+const emit = defineEmits(['runAll', 'runTest', 'update:timeout', 'update:vendor', 'runCustom'])
+
+// Custom dialog state
+const showCustomDialog = ref(false)
+const customJson = ref('')
+
+// Computed: Check if JSON is valid
+const isJsonValid = computed(() => {
+  if (!customJson.value.trim()) return true
+  try {
+    JSON.parse(customJson.value)
+    return true
+  } catch {
+    return false
+  }
+})
 
 // Test types with icons and descriptions
 const tests = [
@@ -125,11 +188,12 @@ const tests = [
   { type: 'chat-stream', icon: '⚡', label: 'Chat Stream', description: 'Streaming chat completion test' },
   { type: 'reasoning', icon: '🧠', label: 'Reasoning', description: 'Chain-of-thought reasoning test' },
   { type: 'functioncall', icon: '🔧', label: 'Function Call', description: 'Function calling capability test' },
-  { type: 'struct', icon: '📐', label: 'Structured', description: 'Structured output test' },
-  { type: 'embedding', icon: '🔢', label: 'Embedding', description: 'Text embedding generation test' },
-  { type: 'multimodal', icon: '🖼', label: 'Multimodal', description: 'Vision/image analysis test' },
-  { type: 'batch', icon: '📦', label: 'Batch', description: 'Batch request test' }
 ]
+
+// Validate JSON
+const validateJson = () => {
+  // isJsonValid computed handles this
+}
 
 // Handle run all tests
 const handleRunAll = () => {
@@ -141,6 +205,17 @@ const handleRunTest = (testType) => {
   emit('runTest', testType)
 }
 
+// Open custom dialog
+const openCustomDialog = () => {
+  showCustomDialog.value = true
+}
+
+// Handle custom test
+const runCustomTest = () => {
+  emit('runCustom', JSON.parse(customJson.value))
+  closeCustomDialog()
+}
+
 // Handle timeout update
 const handleTimeoutUpdate = (event) => {
   const value = parseInt(event.target.value, 10)
@@ -149,13 +224,27 @@ const handleTimeoutUpdate = (event) => {
   }
 }
 
-// Handle max tokens update
-const handleMaxTokensUpdate = (event) => {
-  const value = parseInt(event.target.value, 10)
-  if (!isNaN(value) && value >= 1 && value <= 32000) {
-    emit('update:maxTokens', value)
-  }
+// Handle vendor update
+const handleVendorUpdate = (event) => {
+  emit('update:vendor', event.target.value)
 }
+
+// Close custom dialog
+const closeCustomDialog = () => {
+  showCustomDialog.value = false
+  customJson.value = ''
+}
+
+// Watch for custom dialog opening
+watch(showCustomDialog, (isOpen) => {
+  if (isOpen) {
+    // Focus textarea when dialog opens
+    setTimeout(() => {
+      const textarea = document.querySelector('.json-textarea')
+      if (textarea) textarea.focus()
+    }, 100)
+  }
+})
 </script>
 
 <style scoped>
@@ -401,6 +490,16 @@ const handleMaxTokensUpdate = (event) => {
   color: var(--text);
 }
 
+.test-btn-custom {
+  border-style: dashed;
+  border-color: var(--accent-active);
+  color: var(--accent-active);
+}
+
+.test-btn-custom:hover {
+  background: var(--glow-blue);
+}
+
 .test-icon {
   font-size: 16px;
   flex-shrink: 0;
@@ -480,6 +579,152 @@ const handleMaxTokensUpdate = (event) => {
 
 .config-input[type='number'] {
   -moz-appearance: textfield;
+}
+
+/* Dialog Styles */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.dialog {
+  background: var(--surface);
+  border: 2px solid var(--error);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.3s ease;
+}
+
+.dialog-valid {
+  border-color: var(--border);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dialog-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.dialog-close:hover {
+  color: var(--text);
+}
+
+.dialog-body {
+  padding: 20px;
+}
+
+.dialog-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.json-textarea {
+  width: 100%;
+  min-height: 200px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  resize: vertical;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.5;
+}
+
+.json-textarea:focus {
+  outline: none;
+  border-color: var(--accent-active);
+  box-shadow: 0 0 0 3px var(--glow-blue);
+}
+
+.json-error {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+.json-error-text {
+  color: var(--error);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.json-success-text {
+  color: var(--success);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.dialog-btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dialog-btn-cancel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.dialog-btn-cancel:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.dialog-btn-confirm {
+  background: var(--accent-active);
+  border: none;
+  color: var(--bg);
+}
+
+.dialog-btn-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Responsive adjustments */

@@ -92,8 +92,47 @@
             <span v-if="isModelSelected(model)" class="check-icon">✓</span>
           </label>
         </div>
+
+        <!-- Custom Model Button -->
+        <div class="custom-model-section">
+          <button class="custom-model-btn" @click="showCustomModelDialog = true">
+            <span class="custom-icon">+</span>
+            Custom Model
+          </button>
+        </div>
       </div>
     </section>
+
+    <!-- Custom Model Dialog -->
+    <div v-if="showCustomModelDialog" class="dialog-overlay" @click.self="showCustomModelDialog = false">
+      <div class="dialog">
+        <div class="dialog-header">
+          <h3 class="dialog-title">Add Custom Model</h3>
+          <button class="dialog-close" @click="showCustomModelDialog = false">✕</button>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label class="form-label">Model Name</label>
+            <input
+              v-model="customModelName"
+              type="text"
+              class="form-input"
+              placeholder="e.g., gemini-2.5-flash-exp"
+              @keyup.enter="addCustomModel"
+            />
+            <p class="form-hint">Enter the model identifier you want to use</p>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="dialog-btn dialog-btn-cancel" @click="showCustomModelDialog = false">
+            Cancel
+          </button>
+          <button class="dialog-btn dialog-btn-confirm" @click="addCustomModel" :disabled="!customModelName.trim()">
+            Add Model
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -128,14 +167,18 @@ const modelTypes = {
 // Active tab - using ref (not reactive) as specified
 const activeTab = ref('text')
 
+// Custom model dialog state
+const showCustomModelDialog = ref(false)
+const customModelName = ref('')
+
 // Local reactive state for configuration
 const localConfig = reactive({
   baseUrl: props.config.baseUrl || '',
   apiKey: props.config.apiKey || '',
   models: {
-    text: props.config.models?.text || [],
-    image: props.config.models?.image || [],
-    video: props.config.models?.video || []
+    text: [...(props.config.models?.text || [])],
+    image: [...(props.config.models?.image || [])],
+    video: [...(props.config.models?.video || [])]
   }
 })
 
@@ -146,9 +189,18 @@ const localSelectedModels = reactive({
   video: []
 })
 
-// Computed: Available models for current tab
+// Custom models per tab
+const customModels = reactive({
+  text: [],
+  image: [],
+  video: []
+})
+
+// Computed: Available models for current tab (including custom models)
 const availableModels = computed(() => {
-  return localConfig.models[activeTab.value] || []
+  const baseModels = localConfig.models[activeTab.value] || []
+  const custom = customModels[activeTab.value] || []
+  return [...baseModels, ...custom]
 })
 
 // Computed: Selected models for current tab
@@ -196,6 +248,23 @@ const removeModel = (model) => {
   }
 }
 
+// Method: Add custom model
+const addCustomModel = () => {
+  const modelName = customModelName.value.trim()
+  if (!modelName) return
+
+  const currentCustomModels = customModels[activeTab.value]
+  if (!currentCustomModels.includes(modelName)) {
+    currentCustomModels.push(modelName)
+    // Auto-select the custom model
+    localSelectedModels[activeTab.value].push(modelName)
+    emitSelectedModelsUpdate()
+  }
+
+  customModelName.value = ''
+  showCustomModelDialog.value = false
+}
+
 // Method: Emit config update
 const emitConfigUpdate = () => {
   emit('update:config', { ...localConfig })
@@ -222,9 +291,9 @@ watch(() => props.config, (newConfig) => {
     localConfig.apiKey = newConfig.apiKey || ''
     if (newConfig.models) {
       localConfig.models = {
-        text: newConfig.models.text || [],
-        image: newConfig.models.image || [],
-        video: newConfig.models.video || []
+        text: [...(newConfig.models.text || [])],
+        image: [...(newConfig.models.image || [])],
+        video: [...(newConfig.models.video || [])]
       }
     }
   }
@@ -306,6 +375,12 @@ watch(() => props.config, (newConfig) => {
 
 .form-input:hover {
   border-color: var(--border2);
+}
+
+.form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
 /* Tabs Styling */
@@ -503,6 +578,142 @@ watch(() => props.config, (newConfig) => {
   color: var(--accent-active);
   font-size: 14px;
   font-weight: bold;
+}
+
+/* Custom Model Section */
+.custom-model-section {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.custom-model-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--surface2);
+  border: 1px dashed var(--border2);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.custom-model-btn:hover {
+  border-color: var(--accent-active);
+  color: var(--accent-active);
+  background: var(--glow-blue);
+}
+
+.custom-icon {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Dialog Styles */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dialog-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.dialog-close:hover {
+  color: var(--text);
+}
+
+.dialog-body {
+  padding: 20px;
+}
+
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.dialog-btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dialog-btn-cancel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.dialog-btn-cancel:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.dialog-btn-confirm {
+  background: var(--accent-active);
+  border: none;
+  color: var(--bg);
+}
+
+.dialog-btn-confirm:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.dialog-btn-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Scrollbar for models list */

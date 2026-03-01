@@ -13,16 +13,23 @@ export function useAnthropic() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model } = config
+      const { baseUrl, apiKey, model, vendor } = config
       const url = `${baseUrl}/messages`
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      }
+
+      // Add vendor header if provided
+      if (vendor) {
+        headers['X-Zenlayer-Vendor'] = vendor
+      }
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
+        headers,
         body: JSON.stringify({
           model,
           max_tokens: payload.maxTokens || 1024,
@@ -62,16 +69,23 @@ export function useAnthropic() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model } = config
+      const { baseUrl, apiKey, model, vendor } = config
       const url = `${baseUrl}/messages`
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      }
+
+      // Add vendor header if provided
+      if (vendor) {
+        headers['X-Zenlayer-Vendor'] = vendor
+      }
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
+        headers,
         body: JSON.stringify({
           model,
           max_tokens: payload.maxTokens || 1024,
@@ -119,16 +133,23 @@ export function useAnthropic() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model } = config
+      const { baseUrl, apiKey, model, vendor } = config
       const url = `${baseUrl}/messages`
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      }
+
+      // Add vendor header if provided
+      if (vendor) {
+        headers['X-Zenlayer-Vendor'] = vendor
+      }
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
+        headers,
         body: JSON.stringify({
           model,
           max_tokens: payload.maxTokens || 1024,
@@ -168,16 +189,23 @@ export function useAnthropic() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model } = config
+      const { baseUrl, apiKey, model, vendor } = config
       const url = `${baseUrl}/messages`
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      }
+
+      // Add vendor header if provided
+      if (vendor) {
+        headers['X-Zenlayer-Vendor'] = vendor
+      }
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
+        headers,
         body: JSON.stringify({
           model,
           max_tokens: payload.maxTokens || 1024,
@@ -212,178 +240,12 @@ export function useAnthropic() {
     }
   }
 
-  const runStructured = async (config, payload) => {
-    state.loading = true
-    state.error = null
-    const startTime = Date.now()
-
-    try {
-      const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/messages`
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: payload.maxTokens || 1024,
-          messages: [{ role: 'user', content: 'Respond with valid JSON only. Schema: ' + JSON.stringify(payload.schema) + '\n\n' + payload.prompt }]
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
-      return state.response
-    } catch (err) {
-      state.error = err
-      throw err
-    } finally {
-      state.loading = false
-    }
-  }
-
-  const runEmbedding = async (config, payload) => {
-    const error = new Error('Embeddings are not supported by Anthropic API')
-    state.error = error
-    throw error
-  }
-
-  const runMultimodal = async (config, payload) => {
-    state.loading = true
-    state.error = null
-    const startTime = Date.now()
-
-    try {
-      const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/messages`
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: payload.maxTokens || 1024,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'text', text: payload.prompt || 'Describe this image' },
-              { type: 'image', source: { type: 'base64', media_type: payload.imageType, data: payload.imageData } }
-            ]
-          }]
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
-      return state.response
-    } catch (err) {
-      state.error = err
-      throw err
-    } finally {
-      state.loading = false
-    }
-  }
-
-  const runBatch = async (config, payloads) => {
-    state.loading = true
-    state.error = null
-    const startTime = Date.now()
-    const results = []
-
-    try {
-      for (const payload of payloads) {
-        const { baseUrl, apiKey, model } = config
-        const url = `${baseUrl}/messages`
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: payload.maxTokens || 1024,
-            messages: [{ role: 'user', content: payload.prompt }]
-          })
-        })
-
-        if (!response.ok) {
-          const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-          throw error
-        }
-
-        const data = await response.json()
-        results.push({ status: response.status, statusText: response.statusText, data })
-      }
-
-      const duration = Date.now() - startTime
-
-      state.response = {
-        status: 207,
-        statusText: 'Multi-Status',
-        headers: {},
-        data: { results, count: results.length },
-        duration
-      }
-
-      return state.response
-    } catch (err) {
-      state.error = err
-      throw err
-    } finally {
-      state.loading = false
-    }
-  }
 
   return {
     state,
     sendChat,
     sendChatStream,
     runReasoning,
-    runFunctionCall,
-    runStructured,
-    runEmbedding,
-    runMultimodal,
-    runBatch
+    runFunctionCall
   }
 }

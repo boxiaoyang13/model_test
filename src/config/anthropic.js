@@ -10,5 +10,5 @@ export default {
     image: ['claude-3-5-sonnet-vision', 'claude-3-opus-vision'],
     video: []
   },
-  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall', 'struct', 'embedding', 'multimodal', 'batch']
+  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall', 'struct']
 }

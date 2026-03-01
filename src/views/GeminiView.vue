@@ -31,11 +31,12 @@
           :progress="testRunner.testState.progress"
           :currentTest="testRunner.testState.currentTest"
           :timeout="timeout"
-          :maxTokens="maxTokens"
+          :vendor="vendor"
           @runAll="handleRunAll"
           @runTest="handleRunTest"
+          @runCustom="handleRunCustom"
           @update:timeout="handleTimeoutUpdate"
-          @update:maxTokens="handleMaxTokensUpdate"
+          @update:vendor="handleVendorUpdate"
         />
       </div>
 
@@ -86,7 +87,7 @@ const selectedModels = reactive({
 
 // Quick config refs
 const timeout = ref(30000)
-const maxTokens = ref(4096)
+const vendor = ref('')
 
 // Initialize Gemini API composable
 const gemini = useGemini()
@@ -97,10 +98,6 @@ const testRunner = useTestRunner({
   sendChatStream: gemini.sendChatStream,
   runReasoning: gemini.runReasoning,
   runFunctionCall: gemini.runFunctionCall,
-  runStructured: gemini.runStructured,
-  runEmbedding: gemini.runEmbedding,
-  runMultimodal: gemini.runMultimodal,
-  runBatch: gemini.runBatch
 })
 
 // Handle config update from ConfigPanel
@@ -135,7 +132,7 @@ const handleRunAll = async () => {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
     timeout: timeout.value,
-    maxTokens: maxTokens.value
+    vendor: vendor.value
   }
 
   await testRunner.runAllTests(testConfig, models)
@@ -160,10 +157,40 @@ const handleRunTest = async (testType) => {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
     timeout: timeout.value,
-    maxTokens: maxTokens.value
+    vendor: vendor.value
   }
 
   await testRunner.runSingleTest(testType, testConfig, models)
+}
+
+// Handle run custom test with JSON body
+const handleRunCustom = async (jsonBody) => {
+  const activeTab = configPanelRef.value?.getActiveTab() || 'text'
+  const models = selectedModels[activeTab]
+
+  // Check if API key is provided
+  if (!config.apiKey) {
+    testRunner.addLog('error', 'CUSTOM', 'API Key is required. Please enter your API key first.', '')
+    return
+  }
+
+  // Check if models are selected
+  if (models.length === 0) {
+    testRunner.addLog('error', 'CUSTOM', 'No models selected. Please select at least one model.', '')
+    return
+  }
+
+  // Log that we're sending the custom request
+  testRunner.addLog('info', 'CUSTOM', `Sending custom JSON request to ${models.length} model(s)...`, '')
+
+  const testConfig = {
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    timeout: timeout.value,
+    vendor: vendor.value
+  }
+
+  await testRunner.runSingleTest('custom', testConfig, models, jsonBody)
 }
 
 // Handle timeout update
@@ -171,9 +198,9 @@ const handleTimeoutUpdate = (value) => {
   timeout.value = value
 }
 
-// Handle max tokens update
-const handleMaxTokensUpdate = (value) => {
-  maxTokens.value = value
+// Handle vendor update
+const handleVendorUpdate = (value) => {
+  vendor.value = value
 }
 
 // Handle clear logs
