@@ -155,7 +155,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:config', 'update:selectedModels'])
+const emit = defineEmits(['update:config', 'update:selectedModels', 'tabChange'])
 
 // Model type tabs configuration
 const modelTypes = {
@@ -216,6 +216,7 @@ const selectedModelsCount = computed(() => {
 // Method: Switch to a different tab
 const switchTab = (tab) => {
   activeTab.value = tab
+  emit('tabChange', tab)
 }
 
 // Method: Check if a model is selected

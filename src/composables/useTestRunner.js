@@ -5,7 +5,8 @@ export function useTestRunner(apiMethods) {
     running: false,
     currentTest: null,
     progress: 0,
-    logs: []
+    logs: [],
+    customNotification: null // { success: bool, message: string }
   })
 
   const testMethods = {
@@ -13,6 +14,8 @@ export function useTestRunner(apiMethods) {
     'chat-stream': apiMethods.sendChatStream,
     'reasoning': apiMethods.runReasoning,
     'functioncall': apiMethods.runFunctionCall,
+    'text-to-image': apiMethods.sendImageGen || apiMethods.sendChat,
+    'text-to-video': apiMethods.sendVideoGen || apiMethods.sendChat,
     'custom': apiMethods.sendChat, // Custom test uses sendChat but with custom JSON body
   }
 
@@ -34,15 +37,27 @@ export function useTestRunner(apiMethods) {
   }
 
   const runSingleTest = async (testType, config, models, customJsonBody = null) => {
+    const wasAlreadyRunning = testState.running
+    if (!wasAlreadyRunning) {
+      testState.running = true
+      testState.currentTest = testType
+    }
+
     const targets = models.length ? models : ['(no model selected)']
     const method = testMethods[testType]
 
     if (!method) {
       addLog('error', testType.toUpperCase(), `Test method not found: ${testType}`, '')
+      if (!wasAlreadyRunning) {
+        testState.running = false
+        testState.currentTest = null
+      }
       return
     }
 
     addLog('info', 'START', `Running test: ${testType}`, '')
+
+    let customHadError = false
 
     for (const model of targets) {
       try {
@@ -57,6 +72,17 @@ export function useTestRunner(apiMethods) {
             prompt: 'Schedule a meeting with Bob and Alice for 03/27/2025 at 10:00 AM about the Q3 planning.',
             maxTokens: config.maxTokens || 1024,
             temperature: 0.7
+          }
+        } else if (testType === 'text-to-image') {
+          payload = {
+            prompt: 'A cute baby sea otter',
+            aspectRatio: '4:3',
+            imageSize: '1K'
+          }
+        } else if (testType === 'text-to-video') {
+          payload = {
+            prompt: 'A lone cowboy rides his horse across an open plain at beautiful sunset, soft light, warm colors',
+            durationSeconds: 4
           }
         } else {
           payload = {
@@ -114,52 +140,128 @@ export function useTestRunner(apiMethods) {
               model
             )
           }
+        } else if (testType === 'text-to-video') {
+          // Check if video generation was successful (has videoUri)
+          if (result.status >= 200 && result.status < 300 && result.data?.videoUri) {
+            const videoUri = result.data.videoUri
+            addLog('success', testType.toUpperCase(),
+              `Video generated successfully in ${result.duration}ms. Duration: ${result.data.durationSeconds || 4}s`,
+              model
+            )
+            addLog('info', 'VIDEO URI', videoUri, model)
+          } else {
+            addLog('error', testType.toUpperCase(),
+              `Video generation failed: ${result.data?.videoUri ? 'Error' : 'No video URI in response'}`,
+              model
+            )
+          }
         } else if (result.status >= 200 && result.status < 300) {
-          // Parse response data for better logging
-          let dataSummary = ''
-          if (result.data) {
-            if (result.data.candidates) {
-              const content = result.data.candidates[0]?.content?.parts[0]?.text
-              if (content) {
-                dataSummary = `Content: "${content.slice(0, 80)}${content.length > 80 ? '...' : ''}"`
+          // For custom and text-to-image tests, log the full response body
+          if (testType === 'custom' || testType === 'text-to-image') {
+            const responseBody = JSON.stringify(result.data, null, 2)
+            addLog('success', testType.toUpperCase(),
+              `Response received in ${result.duration}ms. Status: ${result.status}`,
+              model
+            )
+            addLog('info', 'RESPONSE BODY', responseBody, model)
+          } else {
+            // Parse response data for better logging
+            let dataSummary = ''
+            if (result.data) {
+              if (result.data.candidates) {
+                const content = result.data.candidates[0]?.content?.parts[0]?.text
+                if (content) {
+                  dataSummary = `Content: "${content.slice(0, 80)}${content.length > 80 ? '...' : ''}"`
+                } else {
+                  dataSummary = JSON.stringify(result.data).slice(0, 100)
+                }
               } else {
                 dataSummary = JSON.stringify(result.data).slice(0, 100)
               }
-            } else {
-              dataSummary = JSON.stringify(result.data).slice(0, 100)
             }
-          }
 
-          addLog('success', testType.toUpperCase(),
-            `Response received in ${result.duration}ms. ${dataSummary}`,
+            addLog('success', testType.toUpperCase(),
+              `Response received in ${result.duration}ms. ${dataSummary}`,
+              model
+            )
+          }
+        } else {
+          // For custom, text-to-image, and text-to-video tests, show more detailed error
+          if (testType === 'custom' || testType === 'text-to-image' || testType === 'text-to-video') {
+            if (testType === 'custom') customHadError = true
+            const responseBody = result.data ? JSON.stringify(result.data, null, 2) : 'No response body'
+            addLog('error', testType.toUpperCase(),
+              `Status ${result.status}: ${result.statusText || 'Error'} - ${testType === 'custom' ? 'Custom' : testType} test failed`,
+              model
+            )
+            addLog('info', 'RESPONSE BODY', responseBody, model)
+          } else {
+            addLog('error', testType.toUpperCase(),
+              `Status ${result.status}: ${result.statusText || 'Error'}`,
+              model
+            )
+          }
+        }
+      } catch (err) {
+        if (testType === 'custom') customHadError = true
+        // For custom, text-to-image, and text-to-video tests, show detailed error
+        if (testType === 'custom' || testType === 'text-to-image' || testType === 'text-to-video') {
+          addLog('error', testType.toUpperCase(),
+            `${testType === 'custom' ? 'Custom' : testType} test failed: ${err.message}`,
             model
           )
         } else {
-          addLog('error', testType.toUpperCase(),
-            `Status ${result.status}: ${result.statusText || 'Error'}`,
-            model
-          )
+          addLog('error', testType.toUpperCase(), err.message, model)
         }
-      } catch (err) {
-        addLog('error', testType.toUpperCase(), err.message, model)
       }
+    }
+
+    if (!wasAlreadyRunning) {
+      testState.running = false
+      testState.currentTest = null
+    }
+
+    if (testType === 'custom') {
+      testState.customNotification = {
+        success: !customHadError,
+        message: customHadError ? 'Custom test failed' : 'Custom test completed'
+      }
+      setTimeout(() => {
+        testState.customNotification = null
+      }, 4000)
     }
   }
 
-  const runAllTests = async (config, models) => {
+  const runAllTests = async (config, models, activeTab = 'text', customJson = null) => {
     if (testState.running) return
 
     testState.running = true
     testState.progress = 0
 
-    const testTypes = Object.keys(testMethods)
+    // Filter test types based on active tab
+    let testTypes
+    if (activeTab === 'text') {
+      testTypes = ['chat', 'chat-stream', 'reasoning', 'functioncall']
+    } else if (activeTab === 'image') {
+      testTypes = ['text-to-image']
+    } else if (activeTab === 'video') {
+      testTypes = ['text-to-video']
+    } else {
+      testTypes = Object.keys(testMethods)
+    }
+
+    // Add custom test if JSON content is provided
+    if (customJson) {
+      testTypes.push('custom')
+    }
 
     try {
       for (let i = 0; i < testTypes.length; i++) {
         testState.currentTest = testTypes[i]
         testState.progress = (i / testTypes.length) * 100
 
-        await runSingleTest(testTypes[i], config, models, null)
+        const jsonBody = testTypes[i] === 'custom' ? customJson : null
+        await runSingleTest(testTypes[i], config, models, jsonBody)
         await new Promise(resolve => setTimeout(resolve, 150))
       }
 

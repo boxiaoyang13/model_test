@@ -20,6 +20,7 @@
           :config="config"
           @update:config="handleConfigUpdate"
           @update:selectedModels="handleSelectedModelsUpdate"
+          @tabChange="handleTabChange"
         />
       </div>
 
@@ -32,6 +33,8 @@
           :currentTest="testRunner.testState.currentTest"
           :timeout="timeout"
           :vendor="vendor"
+          :activeTab="activeTab"
+          :customNotification="testRunner.testState.customNotification"
           @runAll="handleRunAll"
           @runTest="handleRunTest"
           @runCustom="handleRunCustom"
@@ -46,6 +49,7 @@
           ref="logPanelRef"
           :logs="testRunner.logs.value || []"
           :logCount="testRunner.logCount.value || 0"
+          :activeTab="activeTab"
           @clear="handleClearLogs"
         />
       </div>
@@ -88,6 +92,7 @@ const selectedModels = reactive({
 // Quick config refs
 const timeout = ref(30000)
 const vendor = ref('')
+const activeTab = ref('text')
 
 // Initialize OpenAI API composable
 const openai = useOpenAI()
@@ -113,8 +118,13 @@ const handleSelectedModelsUpdate = (newSelectedModels) => {
   selectedModels.video = newSelectedModels.video
 }
 
+// Handle tab change from ConfigPanel
+const handleTabChange = (tab) => {
+  activeTab.value = tab
+}
+
 // Handle run all tests
-const handleRunAll = async () => {
+const handleRunAll = async (customJson = null) => {
   const activeTab = configPanelRef.value?.getActiveTab() || 'text'
   const models = selectedModels[activeTab]
 
@@ -135,7 +145,7 @@ const handleRunAll = async () => {
     vendor: vendor.value
   }
 
-  await testRunner.runAllTests(testConfig, models)
+  await testRunner.runAllTests(testConfig, models, activeTab, customJson)
 }
 
 // Handle run individual test
@@ -290,8 +300,9 @@ const handleClearLogs = () => {
 
 .log-section {
   background: var(--bg);
-  padding: 20px;
+  padding: 0;
   overflow: hidden;
+  flex: 1;
 }
 
 /* Scrollbar styling */

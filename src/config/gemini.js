@@ -7,8 +7,8 @@ export default {
   baseUrl: 'https://gateway.theturbo.ai',
   models: {
     text: ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview'],
-    image: ['imagen-3.0', 'imagen-2.0', 'gemini-vision'],
-    video: ['veo-2', 'veo-1']
+    image: ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview'],
+    video: ['veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview']
   },
-  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall', 'struct']
+  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall']
 }

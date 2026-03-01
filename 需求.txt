@@ -198,3 +198,139 @@ curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-3-flash:generateContent
                 "date": "2025-03-27"
               }
             },
+
+
+页面功能优化
+三个页面：gemini.vue anthropic.vue vopenai.vue 均有
+1、log 输出的框的底部到达浏览器的页面的底部。
+2、点击text， INDIVIDUAL TESTS 内容保持不变
+点击tabImage，INDIVIDUAL TESTS 为 变为 文生图，custom
+点击tab Video，INDIVIDUAL TESTS 为 变为 文生视频，custom
+
+
+页面功能优化
+三个页面：gemini.vue anthropic.vue vopenai.vue 均有
+1、text，Image Video 的 custom 测试了，右边的log 打印出回复的body。 
+
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Provide a list of 3 famous physicists and their key contributions"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "thinkingConfig": {
+          "thinkingLevel": "high"
+    }
+  }
+}
+
+页面功能优化
+三个页面：gemini.vue anthropic.vue vopenai.vue 均有
+1、custom 点击测试完成了，现在的逻辑是点击后，原有填写的内容没有了，
+修改还还需要有，便于修改，下次在运行。 
+
+
+页面功能优化
+三个页面：gemini.vue anthropic.vue vopenai.vue 均有
+1、custom 点击测试，但是没有任何反馈，发送中回复之前，custom的的外框的虚线增加转动的动画效果。
+如果状态码不是200，提示custom测试失败
+
+
+页面功能优化
+三个页面：gemini.vue anthropic.vue vopenai.vue 均有
+1 、点击run all test 仅仅 测试 当前选中的的Tab页（目前 是所有tab 页的内容） 
+
+
+代码优化：
+1、gemini 发送 文生图 测试 的协议示例：
+curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash-image:generateContent \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "Authorization: Bearer $YOUR_API_KEY" \
+	-d "{
+	\"contents\": [{
+		\"role\": \"user\",
+		\"parts\": [{
+			\"text\": \"A cute baby sea otter\"
+		}]
+	}],
+	\"generationConfig\": {
+		\"imageConfig\": {
+			\"aspectRatio\": \"4:3\",
+			\"imageSize\": \"1K\"
+		}
+	}
+}"
+响应内容 data 是 base64 编码的，需要你在log 区域，解码，展示图片
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "inlineData": {
+              "mimeType": "image/png",
+              "data": "..."
+            }
+          }
+        ]
+      },
+      "finishReason": "STOP"
+    }
+  ],
+
+我点击测试，只是打印了返回的json 并没有解码展示图片。
+
+代码优化：
+1、gemini 发送 文生视频 测试 的协议示例：
+curl https://gateway.theturbo.ai/v1/v1beta/models/veo-3.0-fast-generate-001:predictLongRunning \
+-H "Content-Type: application/json" \
+-H "x-goog-api-key: sk-f1v8UVMOjJ-ywJzxLvG7Tks3VEV8DGzyaO-JYTfQ25RM-7e0" \
+-d '{
+	"instances": [
+		{
+			"prompt": "A lone cowboy rides his horse across an open plain at beautiful sunset, soft light, warm colors"
+		}
+	],
+	"parameters": {
+		"durationSeconds": 4
+	}
+}'
+
+响应内容 如下，operations 后面是任务ID
+{
+  "name": "models/veo-3.0-fast-generate-001/operations/r2kjwq83wpwm"
+}
+
+每秒查询任务ID 
+
+     https://gateway.theturbo.ai/v1beta/models/veo-3.1-fast-generate-preview/operations/0e24befc-1447-4572-90c6-ab36b3014c99
+curl https://gateway.theturbo.ai/v1beta/models/veo-3.0-fast-generate-001/operations/0e24befc-1447-4572-90c6-ab36b3014c99\
+-H "x-goog-api-key: e8f0a6b6-df4f-4327-bc1c-bc2fea2fe3f" 
+
+响应内容 如下，如果 "done": true, 而且uri 有下载地址，说明生成视频成功了否则log打印失败了。
+{
+  "name": "models/veo-3.1-generate-preview/operations/r2kjwq83wpwm",
+  "done": true,
+  "response": {
+    "@type": "type.googleapis.com/google.ai.generativelanguage.v1beta.PredictLongRunningResponse",
+    "generateVideoResponse": {
+      "generatedSamples": [
+        {
+          "video": {
+            "uri": "https://gateway.theturbo.ai/v1beta/files/cnh6bbyqps5l:download?alt=media"
+          }
+        }
+      ]
+    }
+  }
+}
+成功后下载视频，并提供视频预览窗口，点击开始按钮，可以正常播放。
+
+

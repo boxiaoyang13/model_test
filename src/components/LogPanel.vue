@@ -39,7 +39,54 @@
             <span class="log-timestamp">{{ formatTimestamp(log.timestamp) }}</span>
             <span v-if="log.model" class="log-model">{{ log.model }}</span>
           </div>
-          <div class="log-entry-content">{{ log.content }}</div>
+          <div class="log-entry-content">
+            <!-- Check if content contains image data (only for RESPONSE BODY logs) -->
+            <template v-if="log.tag === 'RESPONSE BODY' && hasImageData(log.content)">
+              <div class="log-image-container">
+                <img
+                  v-if="getImageData(log.content)"
+                  :src="getImageData(log.content)"
+                  :alt="log.tag"
+                  class="log-image"
+                  @click="expandImage(getImageData(log.content))"
+                />
+                <p class="image-hint">Click to expand image</p>
+              </div>
+            </template>
+            <!-- Check if content contains video URI (for VIDEO URI logs) -->
+            <template v-else-if="log.tag === 'VIDEO URI'">
+              <div class="log-video-container">
+                <div class="video-preview" v-if="!isVideoExpanded">
+                  <div class="video-placeholder" @click="expandVideo(log.content)">
+                    <span class="video-icon">🎬</span>
+                    <p class="video-hint">Click to play video</p>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              {{ log.content }}
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Image Modal -->
+      <div v-if="expandedImage" class="image-modal" @click="closeImageModal">
+        <img :src="expandedImage" class="expanded-image" @click.stop />
+        <button class="close-modal-btn" @click="closeImageModal">✕</button>
+      </div>
+
+      <!-- Video Modal -->
+      <div v-if="expandedVideo" class="video-modal" @click="closeVideoModal">
+        <div class="video-modal-content" @click.stop>
+          <video
+            :src="expandedVideo"
+            class="expanded-video"
+            controls
+            autoplay
+          ></video>
+          <button class="close-modal-btn" @click="closeVideoModal">✕</button>
         </div>
       </div>
     </div>
@@ -58,12 +105,19 @@ const props = defineProps({
   logCount: {
     type: Number,
     default: 0
+  },
+  activeTab: {
+    type: String,
+    default: 'text'
   }
 })
 
 const emit = defineEmits(['clear'])
 
 const logBodyRef = ref(null)
+const expandedImage = ref(null)
+const expandedVideo = ref(null)
+const isVideoExpanded = ref(false)
 
 // Handle clear button click
 const handleClear = () => {
@@ -80,6 +134,103 @@ const formatTimestamp = (timestamp) => {
     second: '2-digit',
     hour12: false
   })
+}
+
+// Helper: find inlineData from candidates
+const findInlineData = (candidates) => {
+  if (!candidates || candidates.length === 0) return null
+
+  for (const candidate of candidates) {
+    if (candidate.content?.parts) {
+      for (const part of candidate.content.parts) {
+        if (part.inlineData?.data && part.inlineData?.mimeType) {
+          return part.inlineData
+        }
+      }
+    }
+  }
+  return null
+}
+
+// Check if content contains image data (base64 or inlineData)
+const hasImageData = (content) => {
+  if (!content) return false
+
+  // Handle object (result.data directly)
+  if (typeof content === 'object') {
+    const inlineData = findInlineData(content.candidates)
+    return !!inlineData
+  }
+
+  // Handle string (JSON stringified content)
+  if (typeof content === 'string') {
+    // Quick check: likely JSON if it starts with '{' or '['
+    const trimmed = content.trim()
+    if (trimmed[0] !== '{' && trimmed[0] !== '[') {
+      return false
+    }
+
+    try {
+      const parsed = JSON.parse(content)
+      const inlineData = findInlineData(parsed.candidates) || parsed.inlineData
+      return !!inlineData
+    } catch (e) {
+      return false
+    }
+  }
+
+  return false
+}
+
+// Extract image data URL from content
+const getImageData = (content) => {
+  if (!content) return null
+
+  // Handle object (result.data directly)
+  if (typeof content === 'object') {
+    const inlineData = findInlineData(content.candidates)
+    if (inlineData?.data && inlineData?.mimeType) {
+      return `data:${inlineData.mimeType};base64,${inlineData.data}`
+    }
+    return null
+  }
+
+  // Handle string (JSON stringified content)
+  if (typeof content === 'string') {
+    try {
+      const parsed = JSON.parse(content)
+      const inlineData = findInlineData(parsed.candidates) || parsed.inlineData
+      if (inlineData?.data && inlineData?.mimeType) {
+        return `data:${inlineData.mimeType};base64,${inlineData.data}`
+      }
+    } catch (e) {
+      return null
+    }
+  }
+
+  return null
+}
+
+// Expand image to modal
+const expandImage = (imageUrl) => {
+  expandedImage.value = imageUrl
+}
+
+// Close image modal
+const closeImageModal = () => {
+  expandedImage.value = null
+}
+
+// Expand video to modal
+const expandVideo = (videoUrl) => {
+  expandedVideo.value = videoUrl
+  isVideoExpanded.value = true
+}
+
+// Close video modal
+const closeVideoModal = () => {
+  expandedVideo.value = null
+  isVideoExpanded.value = false
 }
 
 // Auto-scroll to bottom when new logs are added
@@ -102,8 +253,9 @@ watch(() => props.logs, () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: 400px;
-  max-height: 60vh;
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 /* Log Header */
@@ -341,6 +493,150 @@ watch(() => props.logs, () => {
 
 .log-entries::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+/* Image Display Styles */
+.log-image-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.log-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border);
+}
+
+.log-image:hover {
+  border-color: var(--accent-active);
+  box-shadow: 0 0 10px var(--glow-blue);
+}
+
+.image-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Image Modal */
+.image-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.expanded-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.close-modal-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-size: 20px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.close-modal-btn:hover {
+  background: var(--surface2);
+  border-color: var(--accent-active);
+  transform: rotate(90deg);
+}
+
+/* Video Display Styles */
+.log-video-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.video-preview {
+  width: 100%;
+}
+
+.video-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  background: var(--surface2);
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.video-placeholder:hover {
+  border-color: var(--accent-active);
+  background: var(--glow-blue);
+}
+
+.video-icon {
+  font-size: 32px;
+}
+
+.video-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Video Modal */
+.video-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.video-modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.expanded-video {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
 }
 
 /* Responsive adjustments */

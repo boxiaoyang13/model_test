@@ -63,8 +63,20 @@
         >
           <span class="test-icon">📝</span>
           <span class="test-label">Custom</span>
+          <span v-if="currentTest === 'custom'" class="test-spinner"></span>
         </button>
       </div>
+      <!-- Custom test notification -->
+      <transition name="notification">
+        <div
+          v-if="customNotification"
+          class="custom-notification"
+          :class="customNotification.success ? 'notification-success' : 'notification-error'"
+        >
+          <span class="notification-icon">{{ customNotification.success ? '✓' : '✕' }}</span>
+          <span>{{ customNotification.message }}</span>
+        </div>
+      </transition>
     </section>
 
     <!-- Quick config section -->
@@ -162,6 +174,14 @@ const props = defineProps({
   vendor: {
     type: String,
     default: ''
+  },
+  activeTab: {
+    type: String,
+    default: 'text'
+  },
+  customNotification: {
+    type: Object,
+    default: null
   }
 })
 
@@ -182,13 +202,26 @@ const isJsonValid = computed(() => {
   }
 })
 
-// Test types with icons and descriptions
-const tests = [
-  { type: 'chat', icon: '💬', label: 'Chat', description: 'Basic chat completion test' },
-  { type: 'chat-stream', icon: '⚡', label: 'Chat Stream', description: 'Streaming chat completion test' },
-  { type: 'reasoning', icon: '🧠', label: 'Reasoning', description: 'Chain-of-thought reasoning test' },
-  { type: 'functioncall', icon: '🔧', label: 'Function Call', description: 'Function calling capability test' },
-]
+// Test types with icons and descriptions - computed based on activeTab
+const tests = computed(() => {
+  if (props.activeTab === 'text') {
+    return [
+      { type: 'chat', icon: '💬', label: 'Chat', description: 'Basic chat completion test' },
+      { type: 'chat-stream', icon: '⚡', label: 'Chat Stream', description: 'Streaming chat completion test' },
+      { type: 'reasoning', icon: '🧠', label: 'Reasoning', description: 'Chain-of-thought reasoning test' },
+      { type: 'functioncall', icon: '🔧', label: 'Function Call', description: 'Function calling capability test' },
+    ]
+  } else if (props.activeTab === 'image') {
+    return [
+      { type: 'text-to-image', icon: '🖼️', label: 'Text to Image', description: 'Generate image from text' },
+    ]
+  } else if (props.activeTab === 'video') {
+    return [
+      { type: 'text-to-video', icon: '🎬', label: 'Text to Video', description: 'Generate video from text' },
+    ]
+  }
+  return []
+})
 
 // Validate JSON
 const validateJson = () => {
@@ -197,7 +230,9 @@ const validateJson = () => {
 
 // Handle run all tests
 const handleRunAll = () => {
-  emit('runAll')
+  const customJsonContent = customJson.value.trim()
+  const customJsonParsed = isJsonValid.value && customJsonContent ? JSON.parse(customJsonContent) : null
+  emit('runAll', customJsonParsed)
 }
 
 // Handle run individual test
@@ -213,7 +248,8 @@ const openCustomDialog = () => {
 // Handle custom test
 const runCustomTest = () => {
   emit('runCustom', JSON.parse(customJson.value))
-  closeCustomDialog()
+  // Close dialog but keep the content for future use
+  showCustomDialog.value = false
 }
 
 // Handle timeout update
@@ -494,10 +530,62 @@ watch(showCustomDialog, (isOpen) => {
   border-style: dashed;
   border-color: var(--accent-active);
   color: var(--accent-active);
+  position: relative;
+  overflow: hidden;
 }
 
 .test-btn-custom:hover {
   background: var(--glow-blue);
+}
+
+.test-btn-custom.running {
+  background: var(--glow-blue);
+  color: var(--text);
+  border-color: var(--accent-active);
+  border-style: dashed;
+  animation: spinDashed 1s linear infinite;
+}
+
+@keyframes spinDashed {
+  0% {
+    border-color: var(--accent-active);
+    box-shadow: 0 0 5px var(--glow-blue);
+  }
+  25% {
+    border-color: var(--accent-gemini);
+  }
+  50% {
+    border-color: var(--accent-active);
+    box-shadow: 0 0 15px var(--glow-blue);
+  }
+  75% {
+    border-color: var(--accent-gemini);
+  }
+  100% {
+    border-color: var(--accent-active);
+    box-shadow: 0 0 5px var(--glow-blue);
+  }
+}
+
+/* Add a pulsing glow effect */
+.test-btn-custom.running::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  border: 2px dashed var(--accent-active);
+  transform: translate(-50%, -50%);
+  animation: spinBorder 2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes spinBorder {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
 .test-icon {
@@ -725,6 +813,46 @@ watch(showCustomDialog, (isOpen) => {
 .dialog-btn-confirm:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Custom test notification */
+.custom-notification {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.notification-success {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid var(--success);
+  color: var(--success);
+}
+
+.notification-error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+
+.notification-icon {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notification-enter-active,
+.notification-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.notification-enter-from,
+.notification-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 /* Responsive adjustments */
