@@ -43,8 +43,8 @@
       <div class="panel-section log-section">
         <LogPanel
           ref="logPanelRef"
-          :logs="testRunner.logs"
-          :logCount="testRunner.logCount"
+          :logs="testRunner.logs.value || []"
+          :logCount="testRunner.logCount.value || 0"
           @clear="handleClearLogs"
         />
       </div>

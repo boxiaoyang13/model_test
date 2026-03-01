@@ -29,7 +29,7 @@
       <!-- Log Entries -->
       <div v-else class="log-entries">
         <div
-          v-for="log in logs.filter(l => l && l.id)"
+          v-for="log in logs"
           :key="log.id"
           class="log-entry"
           :class="`log-entry--${log.type}`"
