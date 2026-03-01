@@ -95,7 +95,40 @@ export function useGemini() {
 
   // Other test methods - implement all 8 methods
   const runReasoning = async (config, payload) => {
-    return sendChat(config, { ...payload, reasoning: true })
+    state.loading = true
+    state.error = null
+    const startTime = Date.now()
+
+    try {
+      const { baseUrl, apiKey, model } = config
+      const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: payload.prompt }] }]
+        })
+      })
+
+      const duration = Date.now() - startTime
+      const data = await response.json()
+
+      state.response = {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        data,
+        duration
+      }
+
+      return state.response
+    } catch (err) {
+      state.error = err
+      throw err
+    } finally {
+      state.loading = false
+    }
   }
 
   const runFunctionCall = async (config, payload) => {
