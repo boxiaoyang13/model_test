@@ -26,6 +26,12 @@ export function useGemini() {
         })
       })
 
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+        state.error = error
+        throw error
+      }
+
       const duration = Date.now() - startTime
       const data = await response.json()
 
@@ -47,7 +53,6 @@ export function useGemini() {
   }
 
   const sendChatStream = async (config, payload) => {
-    // Streaming implementation
     state.loading = true
     state.error = null
     const startTime = Date.now()
@@ -65,6 +70,12 @@ export function useGemini() {
           contents: [{ parts: [{ text: payload.prompt }] }]
         })
       })
+
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+        state.error = error
+        throw error
+      }
 
       const duration = Date.now() - startTime
       const chunks = []
@@ -93,7 +104,6 @@ export function useGemini() {
     }
   }
 
-  // Other test methods - implement all 8 methods
   const runReasoning = async (config, payload) => {
     state.loading = true
     state.error = null
@@ -110,6 +120,12 @@ export function useGemini() {
           contents: [{ parts: [{ text: payload.prompt }] }]
         })
       })
+
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+        state.error = error
+        throw error
+      }
 
       const duration = Date.now() - startTime
       const data = await response.json()
@@ -148,6 +164,12 @@ export function useGemini() {
           tools: [{ functionDeclarations: payload.functions || [] }]
         })
       })
+
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+        state.error = error
+        throw error
+      }
 
       const duration = Date.now() - startTime
       const data = await response.json()
@@ -190,6 +212,12 @@ export function useGemini() {
         })
       })
 
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+        state.error = error
+        throw error
+      }
+
       const duration = Date.now() - startTime
       const data = await response.json()
 
@@ -226,6 +254,12 @@ export function useGemini() {
           content: { parts: [{ text: payload.prompt }] }
         })
       })
+
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+        state.error = error
+        throw error
+      }
 
       const duration = Date.now() - startTime
       const data = await response.json()
@@ -269,6 +303,12 @@ export function useGemini() {
         })
       })
 
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+        state.error = error
+        throw error
+      }
+
       const duration = Date.now() - startTime
       const data = await response.json()
 
@@ -297,8 +337,24 @@ export function useGemini() {
 
     try {
       for (const payload of payloads) {
-        const result = await sendChat(config, payload)
-        results.push(result)
+        const { baseUrl, apiKey, model } = config
+        const url = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: payload.prompt }] }]
+          })
+        })
+
+        if (!response.ok) {
+          const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
+          throw error
+        }
+
+        const data = await response.json()
+        results.push({ status: response.status, statusText: response.statusText, data })
       }
 
       const duration = Date.now() - startTime
