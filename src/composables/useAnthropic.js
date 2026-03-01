@@ -14,7 +14,7 @@ export function useAnthropic() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1/messages`
+      const url = `${baseUrl}/messages`
 
       const response = await fetch(url, {
         method: 'POST',
@@ -25,6 +25,7 @@ export function useAnthropic() {
         },
         body: JSON.stringify({
           model,
+          max_tokens: payload.maxTokens || 1024,
           messages: [{ role: 'user', content: payload.prompt }]
         })
       })
@@ -62,7 +63,7 @@ export function useAnthropic() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1/messages`
+      const url = `${baseUrl}/messages`
 
       const response = await fetch(url, {
         method: 'POST',
@@ -73,6 +74,7 @@ export function useAnthropic() {
         },
         body: JSON.stringify({
           model,
+          max_tokens: payload.maxTokens || 1024,
           messages: [{ role: 'user', content: payload.prompt }],
           stream: true
         })
@@ -118,7 +120,7 @@ export function useAnthropic() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1/messages`
+      const url = `${baseUrl}/messages`
 
       const response = await fetch(url, {
         method: 'POST',
@@ -129,6 +131,7 @@ export function useAnthropic() {
         },
         body: JSON.stringify({
           model,
+          max_tokens: payload.maxTokens || 1024,
           messages: [{ role: 'user', content: payload.prompt }]
         })
       })
@@ -166,7 +169,7 @@ export function useAnthropic() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1/messages`
+      const url = `${baseUrl}/messages`
 
       const response = await fetch(url, {
         method: 'POST',
@@ -177,6 +180,7 @@ export function useAnthropic() {
         },
         body: JSON.stringify({
           model,
+          max_tokens: payload.maxTokens || 1024,
           messages: [{ role: 'user', content: payload.prompt }],
           tools: payload.functions || []
         })
@@ -215,7 +219,7 @@ export function useAnthropic() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1/messages`
+      const url = `${baseUrl}/messages`
 
       const response = await fetch(url, {
         method: 'POST',
@@ -226,7 +230,8 @@ export function useAnthropic() {
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: 'user', content: `${payload.prompt}\n\nPlease respond with valid JSON only.` }]
+          max_tokens: payload.maxTokens || 1024,
+          messages: [{ role: 'user', content: 'Respond with valid JSON only. Schema: ' + JSON.stringify(payload.schema) + '\n\n' + payload.prompt }]
         })
       })
 
@@ -269,7 +274,7 @@ export function useAnthropic() {
 
     try {
       const { baseUrl, apiKey, model } = config
-      const url = `${baseUrl}/v1/messages`
+      const url = `${baseUrl}/messages`
 
       const response = await fetch(url, {
         method: 'POST',
@@ -280,6 +285,7 @@ export function useAnthropic() {
         },
         body: JSON.stringify({
           model,
+          max_tokens: payload.maxTokens || 1024,
           messages: [{
             role: 'user',
             content: [
@@ -325,7 +331,7 @@ export function useAnthropic() {
     try {
       for (const payload of payloads) {
         const { baseUrl, apiKey, model } = config
-        const url = `${baseUrl}/v1/messages`
+        const url = `${baseUrl}/messages`
 
         const response = await fetch(url, {
           method: 'POST',
@@ -336,6 +342,7 @@ export function useAnthropic() {
           },
           body: JSON.stringify({
             model,
+            max_tokens: payload.maxTokens || 1024,
             messages: [{ role: 'user', content: payload.prompt }]
           })
         })
