@@ -177,6 +177,11 @@ const hasImageData = (content) => {
 
   // Handle object (result.data directly)
   if (typeof content === 'object') {
+    // Check for OpenAI format (b64_json)
+    if (content.data && Array.isArray(content.data) && content.data[0]?.b64_json) {
+      return true
+    }
+    // Check for Gemini format (inlineData)
     const inlineData = findInlineData(content.candidates)
     return !!inlineData
   }
@@ -191,6 +196,11 @@ const hasImageData = (content) => {
 
     try {
       const parsed = JSON.parse(content)
+      // Check for OpenAI format (b64_json)
+      if (parsed.data && Array.isArray(parsed.data) && parsed.data[0]?.b64_json) {
+        return true
+      }
+      // Check for Gemini format (inlineData)
       const inlineData = findInlineData(parsed.candidates) || parsed.inlineData
       return !!inlineData
     } catch (e) {
@@ -207,6 +217,11 @@ const getImageData = (content) => {
 
   // Handle object (result.data directly)
   if (typeof content === 'object') {
+    // Check for OpenAI format (b64_json)
+    if (content.data && Array.isArray(content.data) && content.data[0]?.b64_json) {
+      return `data:image/png;base64,${content.data[0].b64_json}`
+    }
+    // Check for Gemini format (inlineData)
     const inlineData = findInlineData(content.candidates)
     if (inlineData?.data && inlineData?.mimeType) {
       return `data:${inlineData.mimeType};base64,${inlineData.data}`
@@ -218,6 +233,11 @@ const getImageData = (content) => {
   if (typeof content === 'string') {
     try {
       const parsed = JSON.parse(content)
+      // Check for OpenAI format (b64_json)
+      if (parsed.data && Array.isArray(parsed.data) && parsed.data[0]?.b64_json) {
+        return `data:image/png;base64,${parsed.data[0].b64_json}`
+      }
+      // Check for Gemini format (inlineData)
       const inlineData = findInlineData(parsed.candidates) || parsed.inlineData
       if (inlineData?.data && inlineData?.mimeType) {
         return `data:${inlineData.mimeType};base64,${inlineData.data}`

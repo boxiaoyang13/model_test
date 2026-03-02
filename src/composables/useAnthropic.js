@@ -13,7 +13,7 @@ export function useAnthropic() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/messages`
 
       const headers = {
@@ -27,10 +27,21 @@ export function useAnthropic() {
         headers['X-Zenlayer-Vendor'] = vendor
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
+      }
+
+      // Check if payload is already a complete request body (custom JSON format)
+      // or just a prompt object
+      let requestBody
+
+      if (payload.model && payload.messages) {
+        // Custom JSON format - use directly as request body
+        requestBody = payload
+      } else {
+        // Standard prompt format - build request body
+        requestBody = {
           model: model,
           max_tokens: payload.maxTokens || 4096,
           system: [{
@@ -44,7 +55,13 @@ export function useAnthropic() {
               text: payload.prompt || '你好，给我科普一下量子力学吧'
             }]
           }]
-        })
+        }
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
@@ -79,7 +96,7 @@ export function useAnthropic() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/messages`
 
       const headers = {
@@ -93,10 +110,21 @@ export function useAnthropic() {
         headers['X-Zenlayer-Vendor'] = vendor
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
+      }
+
+      // Check if payload is already a complete request body (custom JSON format)
+      // or just a prompt object
+      let requestBody
+
+      if (payload.model && payload.messages) {
+        // Custom JSON format - use directly as request body, ensure stream is true
+        requestBody = { ...payload, stream: true }
+      } else {
+        // Standard prompt format - build request body
+        requestBody = {
           model: model,
           max_tokens: payload.maxTokens || 4096,
           system: [{
@@ -111,7 +139,13 @@ export function useAnthropic() {
               text: payload.prompt || '你好，给我科普一下量子力学吧'
             }]
           }]
-        })
+        }
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
@@ -185,7 +219,7 @@ export function useAnthropic() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/messages`
 
       const headers = {
@@ -197,6 +231,11 @@ export function useAnthropic() {
       // Add vendor header if provided
       if (vendor) {
         headers['X-Zenlayer-Vendor'] = vendor
+      }
+
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
       }
 
       const response = await fetch(url, {
@@ -248,7 +287,7 @@ export function useAnthropic() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/messages`
 
       const headers = {
@@ -260,6 +299,11 @@ export function useAnthropic() {
       // Add vendor header if provided
       if (vendor) {
         headers['X-Zenlayer-Vendor'] = vendor
+      }
+
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
       }
 
       // Define tool for function calling

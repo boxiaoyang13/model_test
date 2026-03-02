@@ -33,6 +33,7 @@
           :currentTest="testRunner.testState.currentTest"
           :timeout="timeout"
           :vendor="vendor"
+          :nodeGroup="nodeGroup"
           :activeTab="activeTab"
           :customNotification="testRunner.testState.customNotification"
           @runAll="handleRunAll"
@@ -40,6 +41,7 @@
           @runCustom="handleRunCustom"
           @update:timeout="handleTimeoutUpdate"
           @update:vendor="handleVendorUpdate"
+          @update:nodeGroup="handleNodeGroupUpdate"
         />
       </div>
 
@@ -50,6 +52,8 @@
           :logs="testRunner.logs.value || []"
           :logCount="testRunner.logCount.value || 0"
           :activeTab="activeTab"
+          :apiKey="config.apiKey"
+          :downloadVideo="openai.downloadVideo"
           @clear="handleClearLogs"
         />
       </div>
@@ -92,6 +96,7 @@ const selectedModels = reactive({
 // Quick config refs
 const timeout = ref(30000)
 const vendor = ref('')
+const nodeGroup = ref('')
 const activeTab = ref('text')
 
 // Initialize OpenAI API composable
@@ -103,6 +108,8 @@ const testRunner = useTestRunner({
   sendChatStream: openai.sendChatStream,
   runReasoning: openai.runReasoning,
   runFunctionCall: openai.runFunctionCall,
+  sendImageGen: openai.sendImageGen,
+  sendVideoGen: openai.sendVideoGen,
 })
 
 // Handle config update from ConfigPanel
@@ -142,7 +149,8 @@ const handleRunAll = async (customJson = null) => {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
     timeout: timeout.value,
-    vendor: vendor.value
+    vendor: vendor.value,
+    nodeGroup: nodeGroup.value
   }
 
   await testRunner.runAllTests(testConfig, models, activeTab, customJson)
@@ -167,7 +175,8 @@ const handleRunTest = async (testType) => {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
     timeout: timeout.value,
-    vendor: vendor.value
+    vendor: vendor.value,
+    nodeGroup: nodeGroup.value
   }
 
   await testRunner.runSingleTest(testType, testConfig, models)
@@ -197,7 +206,8 @@ const handleRunCustom = async (jsonBody) => {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
     timeout: timeout.value,
-    vendor: vendor.value
+    vendor: vendor.value,
+    nodeGroup: nodeGroup.value
   }
 
   await testRunner.runSingleTest('custom', testConfig, models, jsonBody)
@@ -211,6 +221,11 @@ const handleTimeoutUpdate = (value) => {
 // Handle vendor update
 const handleVendorUpdate = (value) => {
   vendor.value = value
+}
+
+// Handle node group update
+const handleNodeGroupUpdate = (value) => {
+  nodeGroup.value = value
 }
 
 // Handle clear logs

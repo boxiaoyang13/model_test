@@ -16,13 +16,12 @@ export function useTestRunner(apiMethods) {
     'functioncall': apiMethods.runFunctionCall,
     'text-to-image': apiMethods.sendImageGen || apiMethods.sendChat,
     'text-to-video': apiMethods.sendVideoGen || apiMethods.sendChat,
-    'custom': apiMethods.sendChat, // Custom test uses sendChat but with custom JSON body
   }
 
   const addLog = (type, tag, content, model = '') => {
     const entry = {
       id: Date.now() + Math.random(),
-      timestamp: new Date().toLocaleTimeString('en', { hour12: false }),
+      timestamp: Date.now(),
       type,
       tag,
       content,
@@ -44,9 +43,10 @@ export function useTestRunner(apiMethods) {
     }
 
     const targets = models.length ? models : ['(no model selected)']
-    const method = testMethods[testType]
 
-    if (!method) {
+    // For custom tests, method will be determined based on JSON content
+    const method = testMethods[testType]
+    if (!method && testType !== 'custom') {
       addLog('error', testType.toUpperCase(), `Test method not found: ${testType}`, '')
       if (!wasAlreadyRunning) {
         testState.running = false
@@ -65,13 +65,26 @@ export function useTestRunner(apiMethods) {
 
         // For custom test, use the provided JSON body directly
         let payload
+        let method = testMethods[testType]
+
         if (testType === 'custom' && customJsonBody) {
+          // Determine the method based on custom JSON content
           payload = customJsonBody
-        } else if (testType === 'functioncall') {
-          payload = {
-            prompt: "What's the weather like in Boston today?",
-            maxTokens: config.maxTokens || 2048,
-            temperature: 0.7
+          // Check if it's a video generation request (has 'instances' - Gemini format)
+          if (customJsonBody.instances && Array.isArray(customJsonBody.instances)) {
+            method = apiMethods.sendVideoGen
+          }
+          // Check if it's a video generation request (has 'prompt' and 'seconds' - OpenAI format)
+          else if (customJsonBody.prompt && customJsonBody.seconds !== undefined) {
+            method = apiMethods.sendVideoGen
+          }
+          // Check if it's an image generation request (has 'prompt' but not 'messages' or 'seconds')
+          else if (customJsonBody.prompt && !customJsonBody.messages) {
+            method = apiMethods.sendImageGen
+          }
+          // Default to sendChat for other custom formats (has 'messages' or chat completion format)
+          else {
+            method = apiMethods.sendChat
           }
         } else if (testType === 'reasoning') {
           payload = {
@@ -91,9 +104,10 @@ export function useTestRunner(apiMethods) {
             durationSeconds: 4
           }
         } else {
+          // Default payload for chat and chat-stream
           payload = {
-            prompt: '你好，给我科普一下量子力学吧',
-            maxTokens: config.maxTokens || 1024,
+            prompt: "What's the weather like in Boston today?",
+            maxTokens: config.maxTokens || 2048,
             temperature: 0.7
           }
         }
@@ -219,23 +233,77 @@ export function useTestRunner(apiMethods) {
             )
           }
         } else if (testType === 'text-to-video') {
-          // Check if video generation was successful (has videoUri)
-          if (result.status >= 200 && result.status < 300 && result.data?.videoUri) {
-            const videoUri = result.data.videoUri
-            addLog('success', testType.toUpperCase(),
-              `Video generated successfully in ${result.duration}ms. Duration: ${result.data.durationSeconds || 4}s`,
-              model
-            )
-            addLog('info', 'VIDEO URI', videoUri, model)
+          // Check if video generation was successful
+          if (result.status >= 200 && result.status < 300) {
+            // Check for Gemini format (videoUri)
+            if (result.data?.videoUri) {
+              const videoUri = result.data.videoUri
+              addLog('success', testType.toUpperCase(),
+                `Video generated successfully in ${result.duration}ms. Duration: ${result.data.durationSeconds || 4}s`,
+                model
+              )
+              addLog('info', 'VIDEO URI', videoUri, model)
+            }
+            // Check for OpenAI format (videoId and downloadUrl)
+            else if (result.data?.videoId && result.data?.downloadUrl) {
+              addLog('success', testType.toUpperCase(),
+                `Video generated successfully in ${result.duration}ms. Duration: ${result.data.seconds || 4}s, Size: ${result.data.size || 'unknown'}`,
+                model
+              )
+              addLog('info', 'VIDEO ID', result.data.videoId, model)
+              addLog('info', 'DOWNLOAD URL', result.data.downloadUrl, model)
+            }
+            // Generic success for other formats
+            else {
+              addLog('success', testType.toUpperCase(),
+                `Response received in ${result.duration}ms. Status: ${result.status}`,
+                model
+              )
+              addLog('info', 'RESPONSE BODY', JSON.stringify(result.data, null, 2), model)
+            }
           } else {
             addLog('error', testType.toUpperCase(),
-              `Video generation failed: ${result.data?.videoUri ? 'Error' : 'No video URI in response'}`,
+              `Video generation failed: Status ${result.status}`,
+              model
+            )
+          }
+        } else if (testType === 'text-to-image') {
+          // Check if image generation was successful
+          if (result.status >= 200 && result.status < 300) {
+            // Check for OpenAI format (data array with b64_json)
+            if (result.data?.data && Array.isArray(result.data.data) && result.data.data[0]?.b64_json) {
+              const imageCount = result.data.data.length
+              addLog('success', testType.toUpperCase(),
+                `Image generated successfully in ${result.duration}ms. ${imageCount} image(s) received.`,
+                model
+              )
+              addLog('info', 'RESPONSE BODY', result.data, model)
+            }
+            // Check for Gemini format (candidates with inlineData)
+            else if (result.data?.candidates) {
+              addLog('success', testType.toUpperCase(),
+                `Image generated successfully in ${result.duration}ms.`,
+                model
+              )
+              addLog('info', 'RESPONSE BODY', result.data, model)
+            }
+            // Generic success for other formats
+            else {
+              addLog('success', testType.toUpperCase(),
+                `Response received in ${result.duration}ms. Status: ${result.status}`,
+                model
+              )
+              addLog('info', 'RESPONSE BODY', JSON.stringify(result.data, null, 2), model)
+            }
+          } else {
+            addLog('error', testType.toUpperCase(),
+              `Image generation failed: Status ${result.status}`,
               model
             )
           }
         } else if (result.status >= 200 && result.status < 300) {
-          // For custom and text-to-image tests, log the full response body
-          if (testType === 'custom' || testType === 'text-to-image') {
+          // For custom tests, log the full response body
+          if (testType === 'custom') {
             const responseBody = JSON.stringify(result.data, null, 2)
             addLog('success', testType.toUpperCase(),
               `Response received in ${result.duration}ms. Status: ${result.status}`,
@@ -295,8 +363,9 @@ export function useTestRunner(apiMethods) {
             }
           }
         } else {
-          // For custom, text-to-image, and text-to-video tests, show more detailed error
-          if (testType === 'custom' || testType === 'text-to-image' || testType === 'text-to-video') {
+          // For custom and text-to-video tests, show more detailed error
+          // (text-to-image has specific error handling above)
+          if (testType === 'custom' || testType === 'text-to-video') {
             if (testType === 'custom') customHadError = true
             const responseBody = result.data ? JSON.stringify(result.data, null, 2) : 'No response body'
             addLog('error', testType.toUpperCase(),

@@ -13,7 +13,7 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const headers = {
@@ -27,13 +27,22 @@ export function useGemini() {
         headers['X-Zenlayer-Vendor'] = vendor
       }
 
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
+      }
+
       // Check if payload is already a complete request body (custom JSON format)
       // or just a prompt object
       let requestBody
+
       if (payload.contents) {
-        // Custom JSON format - use directly as request body
+        // Custom JSON format (chat/image) - use directly as request body
         requestBody = payload
-      } else {
+      } else if (payload.instances) {
+        // Custom JSON format (video) - use directly as request body
+        requestBody = payload
+      } else if (payload.prompt) {
         // Standard prompt format - build request body
         requestBody = {
           contents: [{
@@ -45,6 +54,9 @@ export function useGemini() {
             maxOutputTokens: payload.maxTokens || 1024
           }
         }
+      } else {
+        // Fallback - use payload directly
+        requestBody = payload
       }
 
       const response = await fetch(url, {
@@ -85,7 +97,7 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent`
 
       const headers = {
@@ -97,6 +109,11 @@ export function useGemini() {
       // Add vendor header if provided
       if (vendor) {
         headers['X-Zenlayer-Vendor'] = vendor
+      }
+
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
       }
 
       const response = await fetch(url, {
@@ -186,7 +203,7 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const headers = {
@@ -198,6 +215,11 @@ export function useGemini() {
       // Add vendor header if provided
       if (vendor) {
         headers['X-Zenlayer-Vendor'] = vendor
+      }
+
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
       }
 
       const response = await fetch(url, {
@@ -249,7 +271,7 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const headers = {
@@ -261,6 +283,11 @@ export function useGemini() {
       // Add vendor header if provided
       if (vendor) {
         headers['X-Zenlayer-Vendor'] = vendor
+      }
+
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
       }
 
       // Define function declarations for scheduling meeting
@@ -344,7 +371,7 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/v1beta/models/${model}:generateContent`
 
       const headers = {
@@ -356,6 +383,11 @@ export function useGemini() {
       // Add vendor header if provided
       if (vendor) {
         headers['X-Zenlayer-Vendor'] = vendor
+      }
+
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
       }
 
       const response = await fetch(url, {
@@ -407,7 +439,7 @@ export function useGemini() {
     const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor } = config
+      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
       const url = `${baseUrl}/v1beta/models/${model}:predictLongRunning`
 
       const headers = {
@@ -421,18 +453,34 @@ export function useGemini() {
         headers['X-Zenlayer-Vendor'] = vendor
       }
 
-      // Step 1: Submit the video generation request
-      const submitResponse = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      // Add nodeGroup header if provided
+      if (nodeGroup) {
+        headers['X-Zenlayer-Node-Group'] = nodeGroup
+      }
+
+      // Check if payload is already a complete request body (custom JSON format with instances)
+      // or just parameters object
+      let requestBody
+      if (payload.instances && Array.isArray(payload.instances)) {
+        // Custom JSON format - use directly as request body
+        requestBody = payload
+      } else {
+        // Standard parameters format - build request body
+        requestBody = {
           instances: [{
-            prompt: payload.prompt
+            prompt: payload.prompt || 'A lone cowboy rides his horse across an open plain at beautiful sunset, soft light, warm colors'
           }],
           parameters: {
             durationSeconds: payload.durationSeconds || 4
           }
-        })
+        }
+      }
+
+      // Step 1: Submit the video generation request
+      const submitResponse = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
       })
 
       if (!submitResponse.ok) {

@@ -107,6 +107,16 @@
             @input="handleVendorUpdate"
           />
         </div>
+        <div class="config-item full-width">
+          <label class="config-label">Node Group</label>
+          <input
+            :value="nodeGroup"
+            type="text"
+            class="config-input"
+            placeholder="Optional"
+            @input="handleNodeGroupUpdate"
+          />
+        </div>
       </div>
     </section>
 
@@ -175,6 +185,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  nodeGroup: {
+    type: String,
+    default: ''
+  },
   activeTab: {
     type: String,
     default: 'text'
@@ -185,7 +199,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['runAll', 'runTest', 'update:timeout', 'update:vendor', 'runCustom'])
+const emit = defineEmits(['runAll', 'runTest', 'update:timeout', 'update:vendor', 'update:nodeGroup', 'runCustom'])
 
 // Custom dialog state
 const showCustomDialog = ref(false)
@@ -263,6 +277,11 @@ const handleTimeoutUpdate = (event) => {
 // Handle vendor update
 const handleVendorUpdate = (event) => {
   emit('update:vendor', event.target.value)
+}
+
+// Handle node group update
+const handleNodeGroupUpdate = (event) => {
+  emit('update:nodeGroup', event.target.value)
 }
 
 // Close custom dialog
@@ -618,6 +637,10 @@ watch(showCustomDialog, (isOpen) => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+}
+
+.config-item.full-width {
+  grid-column: 1 / -1;
 }
 
 .config-item {
