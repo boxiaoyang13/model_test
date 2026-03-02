@@ -4,11 +4,9 @@ export default {
   sub: 'Claude API',
   badge: 'anthropic-protocol',
   color: '#e8673c',
-  baseUrl: 'https://api.anthropic.com/v1',
+  baseUrl: 'https://gateway.theturbo.ai',
   models: {
-    text: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-3-5-sonnet', 'claude-3-opus'],
-    image: ['claude-3-5-sonnet-vision', 'claude-3-opus-vision'],
-    video: []
+    text: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']
   },
-  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall', 'struct']
+  testTypes: ['chat', 'chat-stream', 'reasoning', 'functioncall']
 }

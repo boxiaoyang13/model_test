@@ -34,7 +34,7 @@
       </div>
       <div class="tabs-container">
         <button
-          v-for="(label, tab) in modelTypes"
+          v-for="(label, tab) in availableTabs"
           :key="tab"
           class="tab-button"
           :class="{ active: activeTab === tab }"
@@ -195,6 +195,28 @@ const customModels = reactive({
   image: [],
   video: []
 })
+
+// Computed: Available tabs (only show tabs that have models)
+const availableTabs = computed(() => {
+  const tabs = {}
+  for (const [key, label] of Object.entries(modelTypes)) {
+    // Check if this tab has any models (either in config or added as custom)
+    const hasModels = (localConfig.models[key]?.length > 0) ||
+                      (customModels[key]?.length > 0)
+    if (hasModels) {
+      tabs[key] = label
+    }
+  }
+  return tabs
+})
+
+// Watch for available tabs and switch to first available if current is not available
+watch(() => Object.keys(availableTabs.value), (availableKeys) => {
+  if (!availableKeys.includes(activeTab.value) && availableKeys.length > 0) {
+    activeTab.value = availableKeys[0]
+    emit('tabChange', activeTab.value)
+  }
+}, { immediate: true })
 
 // Computed: Available models for current tab (including custom models)
 const availableModels = computed(() => {

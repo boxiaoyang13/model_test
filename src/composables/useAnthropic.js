@@ -18,8 +18,8 @@ export function useAnthropic() {
 
       const headers = {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'Accept': 'application/json',
+        'x-api-key': apiKey
       }
 
       // Add vendor header if provided
@@ -31,9 +31,19 @@ export function useAnthropic() {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model,
-          max_tokens: payload.maxTokens || 1024,
-          messages: [{ role: 'user', content: payload.prompt }]
+          model: model,
+          max_tokens: payload.maxTokens || 4096,
+          system: [{
+            type: 'text',
+            text: '你是一个友善的人工智能助手'
+          }],
+          messages: [{
+            role: 'user',
+            content: [{
+              type: 'text',
+              text: payload.prompt || '你好，给我科普一下量子力学吧'
+            }]
+          }]
         })
       })
 
@@ -74,8 +84,8 @@ export function useAnthropic() {
 
       const headers = {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'Accept': 'application/json',
+        'x-api-key': apiKey
       }
 
       // Add vendor header if provided
@@ -87,10 +97,20 @@ export function useAnthropic() {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model,
-          max_tokens: payload.maxTokens || 1024,
-          messages: [{ role: 'user', content: payload.prompt }],
-          stream: true
+          model: model,
+          max_tokens: payload.maxTokens || 4096,
+          system: [{
+            type: 'text',
+            text: '你是一个友善的人工智能助手'
+          }],
+          stream: true,
+          messages: [{
+            role: 'user',
+            content: [{
+              type: 'text',
+              text: payload.prompt || '你好，给我科普一下量子力学吧'
+            }]
+          }]
         })
       })
 
@@ -103,18 +123,50 @@ export function useAnthropic() {
       const duration = Date.now() - startTime
       const chunks = []
       const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let hasDeltaText = false
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        chunks.push(value)
+
+        const chunk = decoder.decode(value, { stream: true })
+        buffer += chunk
+
+        // Process SSE format (data: {...})
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (trimmed.startsWith('data:')) {
+            const jsonStr = trimmed.slice(5).trim()
+            if (jsonStr && jsonStr !== '[DONE]') {
+              try {
+                const data = JSON.parse(jsonStr)
+                chunks.push(data)
+                // Check if delta has text content
+                if (data.delta?.type === 'text_delta' && data.delta.text && data.delta.text.length > 0) {
+                  hasDeltaText = true
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
       }
 
       state.response = {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
-        data: { chunks, chunkCount: chunks.length },
+        data: {
+          chunks,
+          chunkCount: chunks.length,
+          hasDeltaText
+        },
         duration
       }
 
@@ -138,8 +190,8 @@ export function useAnthropic() {
 
       const headers = {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'Accept': 'application/json',
+        'x-api-key': apiKey
       }
 
       // Add vendor header if provided
@@ -151,9 +203,16 @@ export function useAnthropic() {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model,
-          max_tokens: payload.maxTokens || 1024,
-          messages: [{ role: 'user', content: payload.prompt }]
+          model: model,
+          max_tokens: payload.maxTokens || 64000,
+          thinking: {
+            type: 'enabled',
+            budget_tokens: payload.budgetTokens || 32000
+          },
+          messages: [{
+            role: 'user',
+            content: payload.prompt || '解释下量子力学'
+          }]
         })
       })
 
@@ -194,8 +253,8 @@ export function useAnthropic() {
 
       const headers = {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'Accept': 'application/json',
+        'x-api-key': apiKey
       }
 
       // Add vendor header if provided
@@ -203,14 +262,38 @@ export function useAnthropic() {
         headers['X-Zenlayer-Vendor'] = vendor
       }
 
+      // Define tool for function calling
+      const tools = [
+        {
+          name: 'get_weather',
+          description: 'Get the weather at a specific location',
+          input_schema: {
+            type: 'object',
+            properties: {
+              location: {
+                type: 'string'
+              },
+              unit: {
+                type: 'string',
+                enum: ['celsius', 'fahrenheit']
+              }
+            },
+            required: ['location']
+          }
+        }
+      ]
+
       const response = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model,
-          max_tokens: payload.maxTokens || 1024,
-          messages: [{ role: 'user', content: payload.prompt }],
-          tools: payload.functions || []
+          model: model,
+          max_tokens: payload.maxTokens || 2048,
+          messages: [{
+            role: 'user',
+            content: payload.prompt || 'What is the weather in San Francisco?'
+          }],
+          tools: tools
         })
       })
 

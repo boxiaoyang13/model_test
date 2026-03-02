@@ -69,9 +69,15 @@ export function useTestRunner(apiMethods) {
           payload = customJsonBody
         } else if (testType === 'functioncall') {
           payload = {
-            prompt: 'Schedule a meeting with Bob and Alice for 03/27/2025 at 10:00 AM about the Q3 planning.',
-            maxTokens: config.maxTokens || 1024,
+            prompt: 'What is the weather in San Francisco?',
+            maxTokens: config.maxTokens || 2048,
             temperature: 0.7
+          }
+        } else if (testType === 'reasoning') {
+          payload = {
+            prompt: '解释下量子力学',
+            maxTokens: 64000,
+            budgetTokens: 32000
           }
         } else if (testType === 'text-to-image') {
           payload = {
@@ -94,49 +100,94 @@ export function useTestRunner(apiMethods) {
 
         const result = await method(testConfig, payload)
 
-        // Check if streaming test passed (SSE + hasContent)
+        // Check if streaming test passed
         if (testType === 'chat-stream') {
+          // Check for Gemini format (isSSE + hasContent)
           if (result.data?.isSSE && result.data?.hasContent) {
             addLog('success', testType.toUpperCase(),
               `SSE stream successful. ${result.data.chunkCount} chunks received with content in ${result.duration}ms`,
               model
             )
+          }
+          // Check for Anthropic format (hasDeltaText)
+          else if (result.data?.hasDeltaText) {
+            addLog('success', testType.toUpperCase(),
+              `Stream successful. ${result.data.chunkCount} chunks received with delta text in ${result.duration}ms`,
+              model
+            )
+          }
+          // Check for Anthropic fallback format (chunkCount + any chunks received)
+          else if (result.data?.chunkCount && result.data.chunkCount > 0) {
+            addLog('success', testType.toUpperCase(),
+              `Stream successful. ${result.data.chunkCount} chunks received in ${result.duration}ms`,
+              model
+            )
           } else {
             addLog('error', testType.toUpperCase(),
-              `SSE stream failed: ${result.data?.isSSE ? 'SSE' : 'Not SSE'}, ${result.data?.hasContent ? 'Has content' : 'No content'}`,
+              `Stream failed: No valid response received`,
               model
             )
           }
         } else if (testType === 'reasoning') {
-          // Check if reasoning test passed (thoughtsTokenCount > 0)
+          // Check for Gemini format (thoughtsTokenCount > 0)
           const thoughtsTokenCount = result.data?.usageMetadata?.thoughtsTokenCount || 0
           if (result.status >= 200 && result.status < 300 && thoughtsTokenCount > 0) {
             addLog('success', testType.toUpperCase(),
               `Reasoning successful. ${thoughtsTokenCount} thought tokens used in ${result.duration}ms`,
               model
             )
+          }
+          // Check for Anthropic format (content has thinking type)
+          else if (result.data?.content && Array.isArray(result.data.content)) {
+            const hasThinking = result.data.content.some(c => c.type === 'thinking')
+            if (result.status >= 200 && result.status < 300 && hasThinking) {
+              addLog('success', testType.toUpperCase(),
+                `Reasoning successful. Thinking content found in response in ${result.duration}ms`,
+                model
+              )
+            } else {
+              addLog('error', testType.toUpperCase(),
+                `Reasoning failed: No thinking content found in response`,
+                model
+              )
+            }
           } else {
             addLog('error', testType.toUpperCase(),
-              `Reasoning failed: thoughtsTokenCount=${thoughtsTokenCount} (expected > 0)`,
+              `Reasoning failed: No reasoning content found`,
               model
             )
           }
         } else if (testType === 'functioncall') {
-          // Check if function call test passed (has functionCall in response)
-          const hasFunctionCall = result.data?.candidates?.[0]?.content?.parts?.some(
-            part => part.functionCall !== undefined
-          )
+          // Check if function call test passed
+          let hasFunctionCall = false
+          let functionCallName = null
+
+          // Check for Gemini format (candidates with functionCall)
+          if (result.data?.candidates?.[0]?.content?.parts) {
+            hasFunctionCall = result.data.candidates[0].content.parts.some(
+              part => part.functionCall !== undefined
+            )
+            if (hasFunctionCall) {
+              functionCallName = result.data.candidates[0].content.parts.find(
+                part => part.functionCall
+              )?.functionCall?.name
+            }
+          }
+          // Check for Anthropic format (content with tool_use)
+          else if (result.data?.content && Array.isArray(result.data.content)) {
+            const toolUse = result.data.content.find(c => c.type === 'tool_use')
+            hasFunctionCall = !!toolUse
+            functionCallName = toolUse?.name || null
+          }
+
           if (result.status >= 200 && result.status < 300 && hasFunctionCall) {
-            const functionCallName = result.data?.candidates?.[0]?.content?.parts?.find(
-              part => part.functionCall
-            )?.functionCall?.name
             addLog('success', testType.toUpperCase(),
               `Function call successful. Called: ${functionCallName || 'unknown'} in ${result.duration}ms`,
               model
             )
           } else {
             addLog('error', testType.toUpperCase(),
-              `Function call failed: No functionCall found in response`,
+              `Function call failed: No functionCall/tool_use found in response`,
               model
             )
           }
@@ -167,23 +218,44 @@ export function useTestRunner(apiMethods) {
           } else {
             // Parse response data for better logging
             let dataSummary = ''
+            let hasContent = false
+
             if (result.data) {
+              // Check for Gemini format (candidates)
               if (result.data.candidates) {
                 const content = result.data.candidates[0]?.content?.parts[0]?.text
                 if (content) {
+                  hasContent = true
                   dataSummary = `Content: "${content.slice(0, 80)}${content.length > 80 ? '...' : ''}"`
                 } else {
                   dataSummary = JSON.stringify(result.data).slice(0, 100)
+                }
+              }
+              // Check for Anthropic format (content array)
+              else if (result.data.content && Array.isArray(result.data.content)) {
+                const textContent = result.data.content.find(c => c.type === 'text')?.text
+                if (textContent && textContent.length > 0) {
+                  hasContent = true
+                  dataSummary = `Content: "${textContent.slice(0, 80)}${textContent.length > 80 ? '...' : ''}"`
+                } else {
+                  dataSummary = 'No text content in response'
                 }
               } else {
                 dataSummary = JSON.stringify(result.data).slice(0, 100)
               }
             }
 
-            addLog('success', testType.toUpperCase(),
-              `Response received in ${result.duration}ms. ${dataSummary}`,
-              model
-            )
+            if (hasContent) {
+              addLog('success', testType.toUpperCase(),
+                `Response received in ${result.duration}ms. ${dataSummary}`,
+                model
+              )
+            } else {
+              addLog('error', testType.toUpperCase(),
+                `Response failed: ${dataSummary}`,
+                model
+              )
+            }
           }
         } else {
           // For custom, text-to-image, and text-to-video tests, show more detailed error

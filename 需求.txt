@@ -337,3 +337,182 @@ curl https://gateway.theturbo.ai/v1beta/models/veo-3.0-fast-generate-001/operati
 curl -L -o dialogue_example.mp4 -H "x-goog-api-key: $YOUR_API_KEY" "https://gateway.theturbo.ai/v1beta/files/f5uy0kdfz4mc:download?alt=media"
 
 
+
+anthropic.vue 代码优化
+1、该页面暂时只显示Text的Tab ，Image 和 Video Tab 不显示。
+非流式接口示例：
+curl https://gateway.theturbo.ai/v1/messages \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "x-api-key: $YOUR_API_KEY" \
+	-d "{
+	\"model\": \"claude-haiku-4-5-20251001\",
+	\"max_tokens\": 4096,
+	\"system\": [{
+		\"type\": \"text\",
+		\"text\": \"你是一个友善的人工智能助手\"
+	}],
+	\"messages\": [{
+		\"role\": \"user\",
+		\"content\": [{
+			\"type\": \"text\",
+			\"text\": \"你好，给我科普一下量子力学吧\"
+		}]
+	}]
+}"
+响应 如下： 如果 content.text len > 0 则log 输出 成功，否则失败
+{
+	"model": "claude-3-5-haiku-20241022",
+	"id": "msg_bdrk_01AZpXbu4crT5R6gsYJwk6KD",
+	"type": "message",
+	"role": "assistant",
+	"content": [{
+		"type": "text",
+		"text": "量子力学是研究微观世界的物理学分支……"
+	}],
+	"stop_reason": "end_turn",
+	"stop_sequence": null,
+	"usage": {
+		"input_tokens": 36,
+		"cache_creation_input_tokens": 0,
+		"cache_read_input_tokens": 0,
+		"output_tokens": 366
+	}
+}
+
+流式接口示例：
+{
+  "model": "claude-haiku-4-5-20251001",
+  "max_tokens": 4096,
+  "system": [
+    {
+      "type": "text",
+      "text": "你是一个友善的人工智能助手"
+    }
+  ],
+  "stream": true,
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "你好，给我科普一下量子力学吧"
+        }
+      ]
+    }
+  ]
+}
+响应 是SSE 
+找到其中只要一个SSE 中的 delta.text len > 0 就是成功。否则就是失败的。
+{
+  "delta": {
+    "type": "text_delta",
+    "text": "#"
+  },
+  "index": 0,
+  "type": "content_block_delta"
+}
+
+anthropic.vue 代码优化
+function call 接口示例：
+{
+  "model": "claude-opus-4-6",
+  "max_tokens": 2048,
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is the weather in San Francisco?"
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Get the weather at a specific location",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "celsius",
+              "fahrenheit"
+            ]
+          }
+        },
+        "required": [
+          "location"
+        ]
+      }
+    }
+  ]
+}
+响应  中content.type == tool_use 则是成功的，否则是失败的。
+
+{
+  "model": "claude-opus-4-6",
+  "id": "msg_bdrk_01HDDokQU4kML737DSVWSeqH",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "tool_use",
+      "id": "toolu_bdrk_01M8vBhM9GGNQYY4feW9dy3y",
+      "name": "get_weather",
+      "input": {
+        "location": "San Francisco"
+      }
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 587,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 55
+  }
+}
+
+anthropic.vue 代码优化
+reasoing call 接口示例：
+{
+    "model": "claude-sonnet-4-5-20250929",
+    "max_tokens": 64000,
+    "thinking": {
+        "type": "enabled",
+        "budget_tokens": 32000
+    },
+    "messages": [
+        {
+            "role": "user",
+            "content": "解释下量子力学"
+        }
+    ]
+}
+
+响应  中content 数组中，其中一个 type == thinking 则是成功的，否则是失败的。
+{
+  "model": "claude-sonnet-4-5-20250929",
+  "id": "msg_bdrk_018aNg3HAmiD6jAuQwUvDUaW",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "thinking",
+      "thinking": "用户想让我解释量子力学。这是一个很广泛的话题，我应该提供一个清晰、易懂的概述，涵盖主要概念，同时避免过于技术化。我会从基础概念开始，逐步深入。\n\n让我组织一下内容：\n1. 什么是量子力学\n2. 核心概念\n3. 与经典物理的区别\n4. 实际应用\n\n我会尽量用通俗的语言解释。",
+      "signature": "EpsECkgICxABGAIqQAVW4otFtfipABDl9OyqMlgXF81ff2R909hT18okPWIdYN5OO36fb4ehYQbqIYqMNeH04/oVaQsPg+t/lOGFwy8SDCXYTAs9WmQ3KsuviRoMzIC3gtTVVjZ5uXEPIjCjTqELGFzP4nx9B3zyyzZQ/pHTpB+KR8ZPlkvOa8aWgokRwFUSiYZclT7e3St8pOQqgANtO7qApZ51lOTfY3+B4ZoLumUztERgfh/MsQXK2lhQ3auyZMzBDidfSIQgnLpsT0HWpfuuGIZUX5+7YalhdpqWCqfuj0a4ehABwDtanQ8B4NvlVT0a4vIsCYWFqg+o8zdW9kAGAdNYo/ml6iRpoeyuP2W94uUe8VPciF4ht39ygO8T++W7xatGQyt3rdXlae/dWw/73rdczu0BMsFJJWnH439PCXs/mapUVgQbPtz1VvbS5TeG6YQNEB9atGBPc7PrK/nG49VUtAPYY6RaOb/qsshgFyQ8PifnJoNudmEmmj1vTHuZ7VtCy5pwxyn5fqjeghBM4FTwbjtB+fFKdBhyhEnUcULFeQ7CxHMEZDj7Ogbfb0HDhZ3KFlPUwxlCsTS4Cuf18gKufm+QhHWAPMOuCYDiYeMU48MpOmODOvDHQlMA6NEDszh5HxykFhdSEIW8hRxR0g1Z4vsLIJ+PJGMHuLgVSrE/AXSNmlzH3/1m92b6C4Wv47n2agfhhCzTsTkYAQ=="
+    },
+    {
+      "type": "text",
+      "text": "# 量子力学简介\n\n## 什么是量子力学？\n\n量子力学是描述**微观世界**（原子、电子、光子等）运动规律的物理学理论，诞生于20世纪初，颠覆了经典物理学的许多认知。\n\n## 核心概念\n\n### 1. **波粒二象性**\n- 微观粒子既是粒子也是波\n- 例如：光既可以表现为波（干涉现象），也可以表现为粒子（光子）\n\n### 2. **量子化**\n- 能量、角动量等物理量不连续，只能取特定的分立值\n- 就像只能走台阶，不能停在台阶中间\n\n### 3. **不确定性原理**\n- 无法同时精确测量粒子的位置和动量\n- 观测行为会影响测量结果\n\n### 4. **叠加态**\n- 粒子可以同时处于多个状态\n- 著名的\"薛定谔的猫\"：猫在观测前既是活的也是死的\n\n### 5. **量子纠缠**\n- 两个粒子可以产生神奇的关联\n- 无论距离多远，一个粒子的状态变化会瞬间影响另一个\n\n## 与经典物理的区别\n\n| 经典物理 | 量子力学 |\n|---------|---------|\n| 确定性的 | 概率性的 |\n| 连续变化 | 跳跃式变化 |\n| 可精确测量 | 存在测不准关系 |\n\n## 实际应用\n\n- 💻 半导体、芯片技术\n- 📱 激光、LED\n- 🔬 电子显微镜\n- 🔐 量子通信\n- ⚛️ 核能技术\n\n量子力学虽然违背日常直觉，但已被无数实验证实，是现代科技的重要基础！\n\n您想深入了解哪个方面呢？"
+    }
+  ],
+}

@@ -77,8 +77,8 @@ const config = reactive({
   apiKey: '',
   models: {
     text: anthropicConfig.models.text,
-    image: anthropicConfig.models.image,
-    video: anthropicConfig.models.video
+    image: [], // Anthropic: Only text tab supported
+    video: [] // Anthropic: Only text tab supported
   }
 })
 
