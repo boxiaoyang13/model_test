@@ -69,15 +69,15 @@ export function useTestRunner(apiMethods) {
           payload = customJsonBody
         } else if (testType === 'functioncall') {
           payload = {
-            prompt: 'What is the weather in San Francisco?',
+            prompt: "What's the weather like in Boston today?",
             maxTokens: config.maxTokens || 2048,
             temperature: 0.7
           }
         } else if (testType === 'reasoning') {
           payload = {
-            prompt: '解释下量子力学',
-            maxTokens: 64000,
-            budgetTokens: 32000
+            prompt: 'Jane, 54 years old',
+            verbosity: 'medium',
+            reasoningEffort: 'medium'
           }
         } else if (testType === 'text-to-image') {
           payload = {
@@ -109,6 +109,13 @@ export function useTestRunner(apiMethods) {
               model
             )
           }
+          // Check for OpenAI format (hasDeltaContent)
+          else if (result.data?.hasDeltaContent) {
+            addLog('success', testType.toUpperCase(),
+              `Stream successful. ${result.data.chunkCount} chunks received with delta content in ${result.duration}ms`,
+              model
+            )
+          }
           // Check for Anthropic format (hasDeltaText)
           else if (result.data?.hasDeltaText) {
             addLog('success', testType.toUpperCase(),
@@ -129,13 +136,28 @@ export function useTestRunner(apiMethods) {
             )
           }
         } else if (testType === 'reasoning') {
-          // Check for Gemini format (thoughtsTokenCount > 0)
-          const thoughtsTokenCount = result.data?.usageMetadata?.thoughtsTokenCount || 0
-          if (result.status >= 200 && result.status < 300 && thoughtsTokenCount > 0) {
+          // Check for OpenAI format (reasoning_tokens > 0)
+          const reasoningTokens = result.data?.usage?.completion_tokens_details?.reasoning_tokens || 0
+          if (result.status >= 200 && result.status < 300 && reasoningTokens > 0) {
             addLog('success', testType.toUpperCase(),
-              `Reasoning successful. ${thoughtsTokenCount} thought tokens used in ${result.duration}ms`,
+              `Reasoning successful. ${reasoningTokens} reasoning tokens used in ${result.duration}ms`,
               model
             )
+          }
+          // Check for Gemini format (thoughtsTokenCount > 0)
+          else if (result.data?.usageMetadata?.thoughtsTokenCount) {
+            const thoughtsTokenCount = result.data.usageMetadata.thoughtsTokenCount || 0
+            if (result.status >= 200 && result.status < 300 && thoughtsTokenCount > 0) {
+              addLog('success', testType.toUpperCase(),
+                `Reasoning successful. ${thoughtsTokenCount} thought tokens used in ${result.duration}ms`,
+                model
+              )
+            } else {
+              addLog('error', testType.toUpperCase(),
+                `Reasoning failed: thoughtsTokenCount=${thoughtsTokenCount} (expected > 0)`,
+                model
+              )
+            }
           }
           // Check for Anthropic format (content has thinking type)
           else if (result.data?.content && Array.isArray(result.data.content)) {
@@ -162,8 +184,13 @@ export function useTestRunner(apiMethods) {
           let hasFunctionCall = false
           let functionCallName = null
 
+          // Check for OpenAI format (choices with tool_calls)
+          if (result.data?.choices?.[0]?.message?.tool_calls) {
+            hasFunctionCall = result.data.choices[0].message.tool_calls.length > 0
+            functionCallName = result.data.choices[0].message.tool_calls[0]?.function?.name || null
+          }
           // Check for Gemini format (candidates with functionCall)
-          if (result.data?.candidates?.[0]?.content?.parts) {
+          else if (result.data?.candidates?.[0]?.content?.parts) {
             hasFunctionCall = result.data.candidates[0].content.parts.some(
               part => part.functionCall !== undefined
             )
@@ -221,8 +248,18 @@ export function useTestRunner(apiMethods) {
             let hasContent = false
 
             if (result.data) {
+              // Check for OpenAI format (choices)
+              if (result.data.choices && result.data.choices[0]?.message?.content) {
+                const content = result.data.choices[0].message.content
+                if (content && content.length > 0) {
+                  hasContent = true
+                  dataSummary = `Content: "${content.slice(0, 80)}${content.length > 80 ? '...' : ''}"`
+                } else {
+                  dataSummary = 'No message content in response'
+                }
+              }
               // Check for Gemini format (candidates)
-              if (result.data.candidates) {
+              else if (result.data.candidates) {
                 const content = result.data.candidates[0]?.content?.parts[0]?.text
                 if (content) {
                   hasContent = true

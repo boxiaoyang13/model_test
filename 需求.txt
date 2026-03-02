@@ -253,18 +253,12 @@ curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash-image:generat
 	-H "Accept: application/json" \
 	-H "Authorization: Bearer $YOUR_API_KEY" \
 	-d "{
-	\"contents\": [{
-		\"role\": \"user\",
-		\"parts\": [{
-			\"text\": \"A cute baby sea otter\"
+	"contents": [{
+		"role": "user",
+		"parts": [{
+			"text": "A cute baby sea otter"
 		}]
-	}],
-	\"generationConfig\": {
-		\"imageConfig\": {
-			\"aspectRatio\": \"4:3\",
-			\"imageSize\": \"1K\"
-		}
-	}
+	}]
 }"
 响应内容 data 是 base64 编码的，需要你在log 区域，解码，展示图片
 {
@@ -516,3 +510,221 @@ reasoing call 接口示例：
     }
   ],
 }
+
+openai.vue 代码优化
+非stream chat  方式 示例代码
+curl https://gateway.theturbo.ai/v1/chat/completions \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "Authorization: Bearer $YOUR_API_KEY" \
+	-d "{
+	"model": "gpt-4o",
+	"messages": [{
+		"role": "user",
+		"content": "你好，给我科普一下量子力学吧"
+	}]
+}"
+响应示例，choices[].message.content len > 0 就是成功，否则失败
+{
+	"id": "chatcmpl-1234567890",
+	"object": "chat.completion",
+	"created": 1699999999,
+	"model": "gpt-4o",
+	"choices": [
+		{
+			"message": {
+				"role": "assistant",
+				"content": "量子力学是研究微观世界的物理学分支……"
+			},
+			"finish_reason": "stop"
+		}
+	],
+	"usage": {
+		"prompt_tokens": 10,
+		"completion_tokens": 30,
+		"total_tokens": 40
+	}
+}
+
+stream chat  方式 示例代码
+curl https://gateway.theturbo.ai/v1/chat/completions \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "Authorization: Bearer $YOUR_API_KEY" \
+	-d "{
+  "stream:" true,
+	\"model\": \"gpt-4o\",
+	\"messages\": [{
+		\"role\": \"user\",
+		\"content\": \"你好，给我科普一下量子力学吧\"
+	}]
+}"
+
+响应示例，结果是SSE， 其中一个 SSE的 choices[].delta.content len > 0 就是成功，否则失败
+
+{
+  "choices": [
+    {
+      "delta": {
+        "content": "可以"
+      },
+      "finish_reason": null,
+      "index": 0,
+      "logprobs": null
+    }
+  ],
+  "created": 1772414036,
+  "id": "chatcmpl-DEm96uYl9qEQUOXlWrnqeTVYBTePX",
+  "model": "gpt-4o-2024-08-06",
+  "obfuscation": "s6RqSCB",
+  "object": "chat.completion.chunk",
+  "system_fingerprint": "fp_e9b9b028d7",
+  "usage": null
+}
+
+
+
+openai.vue 代码优化
+function call 方式 示例代码
+curl https://gateway.theturbo.ai/v1/chat/completions \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "Authorization: Bearer $YOUR_API_KEY" \
+	-d "{
+	\"model\": \"gpt-4o\",
+	\"messages\": [{
+		\"role\": \"user\",
+		\"content\": \"What's the weather like in Boston today?\"
+	}],
+	\"tools\": [{
+		\"type\": \"function\",
+		\"function\": {
+			\"name\": \"get_current_weather\",
+			\"description\": \"Get the current weather in a given location\",
+			\"parameters\": {
+				\"type\": \"object\",
+				\"properties\": {
+					\"location\": {
+						\"type\": \"string\",
+						\"description\": \"The city and state, e.g. San Francisco, CA\"
+					},
+					\"unit\": {
+						\"type\": \"string\",
+						\"enum\": [\"celsius\", \"fahrenheit\"]
+					}
+				},
+				\"required\": [\"location\"]
+			}
+		}
+	}],
+	\"tool_choice\": \"auto\"
+}"
+响应示例，如果 choices[].message.tool_calls[].function 存在 就是成功，否则就是失败
+{
+  "choices": [
+    {
+      "finish_reason": "tool_calls",
+      "index": 0,
+      "logprobs": null,
+      "message": {
+        "annotations": [],
+        "content": null,
+        "refusal": null,
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": "{\"location\":\"Boston, MA\"}",
+              "name": "get_current_weather"
+            },
+            "id": "call_ZNiazR8je82WpR2AqtwBq8Vk",
+            "type": "function"
+          }
+        ]
+      }
+    }
+  ],
+  "created": 1772414401,
+  "id": "chatcmpl-DEmEzKdWPfqLPFIDgQ9UHguf4AlPC",
+  "model": "gpt-4o-2024-08-06",
+  "object": "chat.completion",
+  "system_fingerprint": "fp_e9b9b028d7",
+  "usage": {
+    "completion_tokens": 18,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens": 80,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    },
+    "total_tokens": 98
+  }
+}
+
+
+openai.vue 代码优化
+reasoing 方式 示例代码
+curl https://gateway.theturbo.ai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+  "model": "gpt-5",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Jane, 54 years old"
+    }
+  ],
+  "verbosity": "medium",
+  "reasoning_effort": "medium"
+}'
+
+响应内容， 如果 usage.completion_tokens_details.reasoning_tokens > 0
+{
+  "id": "chatcmpl-3L5uEazPXR0IGe892In604bdFrzQJ",
+  "object": "chat.completion",
+  "created": 1772419718,
+  "model": "gpt-5",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Hi Jane! How can I help today?\n\nIf you want age-tailored guidance, I can help with:\n- Wellness and screening checklist\n- Joint-friendly fitness or weight-loss plan\n- Nutrition ideas and meal planning\n- Sleep and stress routines\n- Career or retirement planning\n- Hobbies, learning, or travel ideas\n\nTell me your goals, any constraints (time, injuries/conditions), and preferences, and I’ll tailor a plan."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 12,
+    "completion_tokens": 714,
+    "total_tokens": 726,
+    "completion_tokens_details": {
+      "reasoning_tokens": 576
+    }
+  }
+}
+
+
+gemini image 
+模型设置gemini-3-pro-image-preview ，发送的post body 并不是  custom 的内容
+custom 
+设置
+{
+	"contents": [{
+		"role": "user",
+		"parts": [{
+			"text": "A cute baby sea otter"
+		}]
+	}]
+}
+但是发送出去呀没有text 字段。
+
+
+
+

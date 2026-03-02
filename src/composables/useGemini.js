@@ -27,10 +27,15 @@ export function useGemini() {
         headers['X-Zenlayer-Vendor'] = vendor
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      // Check if payload is already a complete request body (custom JSON format)
+      // or just a prompt object
+      let requestBody
+      if (payload.contents) {
+        // Custom JSON format - use directly as request body
+        requestBody = payload
+      } else {
+        // Standard prompt format - build request body
+        requestBody = {
           contents: [{
             role: 'user',
             parts: [{ text: payload.prompt }]
@@ -39,7 +44,13 @@ export function useGemini() {
             temperature: payload.temperature || 0.7,
             maxOutputTokens: payload.maxTokens || 1024
           }
-        })
+        }
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
