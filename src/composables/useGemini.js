@@ -98,7 +98,7 @@ export function useGemini() {
 
     try {
       const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent`
+      const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse`
 
       const headers = {
         'Content-Type': 'application/json',

@@ -40,7 +40,7 @@ curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:generateConte
 	}
 }"
 流式，这是下面这样的，结果如果是SSE ，且有内容，测试就通过了
-curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:streamGenerateContent \
+curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse \
 	-H "Content-Type: application/json" \
 	-H "Accept: application/json" \
 	-H "x-goog-api-key: $YOUR_API_KEY" \
@@ -864,6 +864,25 @@ QUICK CONFIG
 nodeGroup  
 如果填写了，发送增加的header
 head 头是 X-Zenlayer-Node-Group
+
+代码优化：
+gemini.vue 需要增加 参数 alt=sse 
+curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse \
+	-H "Content-Type: application/json" \
+	-H "Accept: application/json" \
+	-H "x-goog-api-key: $YOUR_API_KEY" \
+	-d "{
+	"contents": [{
+		"role": "user",
+		"parts": [{
+			"text": "你好，给我科普一下量子力学吧"
+		}]
+	}],
+	"generationConfig": {
+		"temperature": 0.7,
+		"maxOutputTokens": 1024
+	}
+}"
 
 
 
