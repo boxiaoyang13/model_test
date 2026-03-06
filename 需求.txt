@@ -21,7 +21,7 @@ sk-f1v8UVMOjJ-ywJzxLvG7Tks3VEV8DGzyaO-JYTfQ25RM-7e0
 1、gemini 发送chat的协议示例：
 
 
-     https://gateway.theturbo.ai/v1/v1beta//v1beta/models/gemini-2.0-flash:generateContent
+https://gateway.theturbo.ai/v1/v1beta//v1beta/models/gemini-2.0-flash:generateContent
 非流式
 curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:generateContent \
 	-H "Content-Type: application/json" \
@@ -885,7 +885,49 @@ curl https://gateway.theturbo.ai/v1/v1beta/models/gemini-2.5-flash:streamGenerat
 }"
 
 
+INDIVIDUAL TESTS面板 功能优化：
+原有的Custom 点击弹出输入框，
+1、在Cancel的左边现在增加一个收藏按钮，点击收藏后，按钮后后面展示输入框（假设输入缓存）（默认不展示，只有收藏后才展示） 。
+2、SendRequest 修改为OK。就是仅仅生效，并不是发送。
+3、点击OK后。将收藏的内容保存到后端。（字段：协议、名字、 body内容）
+4、在server路径中增加一个go 的服务（基于gin）和gorm 
+5、db:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: yxb800125
+  name: aimarketplace
+6、下次打开的时候，在按照协议，展示收藏的body。比如custom 旁边多了一个 缓存。
 
+TestPanel 面板优化
+1、Run ALL Test 修改为 Run
+2、自定义的收藏的body 显示为收藏的名字并不是1
+3、自定义的测试按钮和custom 一样，可以点开修改。可以修改保持的body 和保存的名字
 
+TestPanel 面板优化
+1、Chat 、chat stream Reasoing、FunctionCall 、还有收藏的
+可以选中，点击run的时候，只测试，选中的面板。
+
+TestPanel 面板优化
+1、将QUICK TEST 移动到面板的最下面。
+2、将INDIVIDUAL TESTS 修改TEST FUNCTION
+3、增加一个全选按钮。可以将 TEST FUNCTION 下面的 的面板全选
+4、TEST FUNCTION 中 Custom 面板 是 最后一个面版本
+5、自定义的面板显示为收藏的名字，自定义的面板custom 一样，可以点开修改。可以修改保持的body 和保存的名字
+
+TestPanel 面板优化
+1、没有收藏下拉菜单
+2、双击可以代码收藏的面板。打开内容可以修改body，可以修改收藏的名字，可以取消收藏。
+
+1、点击编辑修改，保存修改按钮去掉。最下面一栏的空间的高度太了。和添加body的高度保持一致。
+2、添加自定义body的高度也是点击收藏，高度也会变高。不要变高
+
+1、测试点击收藏，点接OK，即使没有输入名字，关闭了页面，不能关闭，名字输入框变红用来提醒用户输入。
+
+1、收藏变的删除按钮 和上面body 输入框左对齐
+
+1、收藏面板显示是蓝色的边框，和上面chat， chat-stream的 通用面板的边框样式保持一致。
+2、收藏编辑页面，点击删除，弹出的确认框，是系统的，使用element的控件，风格和当前页面一致，确认后
+编辑页面也关闭。
 
 

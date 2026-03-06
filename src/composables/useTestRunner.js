@@ -410,22 +410,27 @@ export function useTestRunner(apiMethods) {
     }
   }
 
-  const runAllTests = async (config, models, activeTab = 'text', customJson = null) => {
+  const runAllTests = async (config, models, activeTab = 'text', customJson = null, selectedTests = null) => {
     if (testState.running) return
 
     testState.running = true
     testState.progress = 0
 
-    // Filter test types based on active tab
+    // 如果指定了选中的测试，使用选中的；否则使用所有可用的测试
     let testTypes
-    if (activeTab === 'text') {
-      testTypes = ['chat', 'chat-stream', 'reasoning', 'functioncall']
-    } else if (activeTab === 'image') {
-      testTypes = ['text-to-image']
-    } else if (activeTab === 'video') {
-      testTypes = ['text-to-video']
+    if (selectedTests && selectedTests.length > 0) {
+      testTypes = [...selectedTests]
     } else {
-      testTypes = Object.keys(testMethods)
+      // Filter test types based on active tab
+      if (activeTab === 'text') {
+        testTypes = ['chat', 'chat-stream', 'reasoning', 'functioncall']
+      } else if (activeTab === 'image') {
+        testTypes = ['text-to-image']
+      } else if (activeTab === 'video') {
+        testTypes = ['text-to-video']
+      } else {
+        testTypes = Object.keys(testMethods)
+      }
     }
 
     // Add custom test if JSON content is provided

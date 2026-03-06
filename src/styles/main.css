@@ -33,6 +33,60 @@ body {
   color: var(--text);
 }
 
+/* Element Plus Message Box Custom Styling */
+.el-message-box__wrapper {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.el-message-box {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+}
+
+.el-message-box__header {
+  padding: 20px 20px 10px !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.el-message-box__title {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  font-size: 16px !important;
+}
+
+.el-message-box__content {
+  padding: 20px !important;
+  color: var(--text-dim) !important;
+}
+
+.el-message-box__btns {
+  padding: 12px 20px 20px !important;
+}
+
+.el-button--primary {
+  background: var(--accent-active) !important;
+  border-color: var(--accent-active) !important;
+  color: var(--bg) !important;
+}
+
+.el-button--primary:hover {
+  background: var(--accent-gemini) !important;
+  border-color: var(--accent-gemini) !important;
+}
+
+.el-button--default {
+  background: var(--surface2) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-dim) !important;
+}
+
+.el-button--default:hover {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;

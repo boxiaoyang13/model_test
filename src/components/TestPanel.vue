@@ -1,62 +1,59 @@
 <template>
   <div class="test-panel">
-    <!-- One-click test section -->
+    <!-- Test Function section -->
     <section class="test-section">
       <div class="section-header">
-        <h3 class="section-title">Quick Test</h3>
-      </div>
-      <button
-        class="run-all-btn"
-        :class="{ running: isRunning }"
-        :disabled="isRunning"
-        @click="handleRunAll"
-      >
-        <span v-if="isRunning" class="spinner"></span>
-        <span v-else class="play-icon">▶</span>
-        {{ isRunning ? 'Running Tests...' : 'Run All Tests' }}
-      </button>
-
-      <!-- Progress Bar -->
-      <div v-if="isRunning" class="progress-container">
-        <div class="progress-bar">
-          <div
-            class="progress-fill"
-            :style="{ width: progress + '%' }"
-          ></div>
-        </div>
-        <div class="progress-info">
-          <span class="progress-label">Progress</span>
-          <span class="progress-value">{{ Math.round(progress) }}%</span>
-        </div>
-        <div v-if="currentTest" class="current-test">
-          Running: {{ currentTest }}
-        </div>
-      </div>
-    </section>
-
-    <!-- Individual test buttons section -->
-    <section class="test-section">
-      <div class="section-header">
-        <h3 class="section-title">Individual Tests</h3>
+        <h3 class="section-title">Test Function</h3>
+        <button class="select-all-btn" @click="toggleSelectAll">
+          <span v-if="isAllSelected">✕ 取消全选</span>
+          <span v-else>✓ 全选</span>
+        </button>
       </div>
       <div class="test-buttons-grid">
+        <!-- Standard test buttons -->
         <button
           v-for="test in tests"
           :key="test.type"
           class="test-btn"
-          :class="{ running: currentTest === test.type }"
+          :class="{
+            running: currentTest === test.type,
+            selected: selectedTests.has(test.type)
+          }"
           :disabled="isRunning"
-          @click="handleRunTest(test.type)"
+          @click.stop="toggleTestSelection(test.type)"
           :title="test.description"
         >
           <span class="test-icon">{{ test.icon }}</span>
           <span class="test-label">{{ test.label }}</span>
           <span v-if="currentTest === test.type" class="test-spinner"></span>
+          <span v-if="selectedTests.has(test.type)" class="test-check">✓</span>
         </button>
-        <!-- Custom Test Button -->
+        <!-- Favorite test buttons -->
+        <button
+          v-for="fav in favorites"
+          :key="fav.id"
+          class="test-btn test-btn-favorite"
+          :class="{
+            running: currentTest === `favorite-${fav.id}`,
+            selected: selectedFavoriteId === fav.id
+          }"
+          :disabled="isRunning"
+          @click.stop="handleFavoriteClick(fav)"
+          @dblclick.stop="editFavorite(fav)"
+          :title="fav.name"
+        >
+          <span class="test-icon">⭐</span>
+          <span class="test-label">{{ fav.name }}</span>
+          <span v-if="currentTest === `favorite-${fav.id}`" class="test-spinner"></span>
+          <span v-if="selectedFavoriteId === fav.id" class="test-check">✓</span>
+        </button>
+        <!-- Custom Test Button (last) -->
         <button
           class="test-btn test-btn-custom"
-          :class="{ running: currentTest === 'custom' }"
+          :class="{
+            running: currentTest === 'custom',
+            selected: selectedFavoriteId !== null
+          }"
           :disabled="isRunning"
           @click="openCustomDialog"
           title="Custom JSON test"
@@ -64,6 +61,7 @@
           <span class="test-icon">📝</span>
           <span class="test-label">Custom</span>
           <span v-if="currentTest === 'custom'" class="test-spinner"></span>
+          <span v-if="selectedFavoriteId !== null" class="test-check">✓</span>
         </button>
       </div>
       <!-- Custom test notification -->
@@ -79,7 +77,7 @@
       </transition>
     </section>
 
-    <!-- Quick config section -->
+    <!-- Quick Config section -->
     <section class="test-section">
       <div class="section-header">
         <h3 class="section-title">Quick Config</h3>
@@ -120,11 +118,45 @@
       </div>
     </section>
 
+    <!-- Quick Test section -->
+    <section class="test-section">
+      <div class="section-header">
+        <h3 class="section-title">Quick Test</h3>
+      </div>
+      <button
+        class="run-all-btn"
+        :class="{ running: isRunning }"
+        :disabled="isRunning"
+        @click="handleRunAll"
+      >
+        <span v-if="isRunning" class="spinner"></span>
+        <span v-else class="play-icon">▶</span>
+        {{ isRunning ? 'Running...' : 'Run' }}
+      </button>
+
+      <!-- Progress Bar -->
+      <div v-if="isRunning" class="progress-container">
+        <div class="progress-bar">
+          <div
+            class="progress-fill"
+            :style="{ width: progress + '%' }"
+          ></div>
+        </div>
+        <div class="progress-info">
+          <span class="progress-label">Progress</span>
+          <span class="progress-value">{{ Math.round(progress) }}%</span>
+        </div>
+        <div v-if="currentTest" class="current-test">
+          Running: {{ currentTest }}
+        </div>
+      </div>
+    </section>
+
     <!-- Custom JSON Test Dialog -->
     <div v-if="showCustomDialog" class="dialog-overlay" @click.self="closeCustomDialog">
       <div class="dialog dialog-invalid" :class="{ 'dialog-valid': isJsonValid }">
         <div class="dialog-header">
-          <h3 class="dialog-title">Custom JSON Body</h3>
+          <h3 class="dialog-title">{{ editingFavoriteId ? '编辑收藏' : 'Custom JSON Body' }}</h3>
           <button class="dialog-close" @click="closeCustomDialog">✕</button>
         </div>
         <div class="dialog-body">
@@ -145,16 +177,40 @@
           </p>
         </div>
         <div class="dialog-footer">
-          <button class="dialog-btn dialog-btn-cancel" @click="closeCustomDialog">
-            Cancel
-          </button>
-          <button
-            class="dialog-btn dialog-btn-confirm"
-            :disabled="!isJsonValid || !customJson.trim()"
-            @click="runCustomTest"
-          >
-            Send Request
-          </button>
+          <div class="footer-left">
+            <button class="dialog-btn dialog-btn-delete" v-if="editingFavoriteId" @click="deleteFavorite(editingFavoriteId)" title="删除收藏">
+              🗑️
+            </button>
+            <button class="dialog-btn dialog-btn-favorite" @click="toggleFavoriteInput" v-if="!editingFavoriteId">
+              收藏
+            </button>
+            <div class="favorite-input-wrapper">
+              <input
+                v-if="showFavoriteInput"
+                v-model="favoriteName"
+                class="favorite-input"
+                :class="{ 'favorite-input-error': showFavoriteInputError }"
+                :placeholder="editingFavoriteId ? '修改收藏名称' : '输入收藏名称'"
+                @keyup.enter="saveFavorite"
+                @input="showFavoriteInputError = false"
+              />
+              <p v-if="showFavoriteInputError && showFavoriteInput" class="favorite-error-text">
+                请输入收藏名称
+              </p>
+            </div>
+          </div>
+          <div class="footer-right">
+            <button class="dialog-btn dialog-btn-cancel" @click="closeCustomDialog">
+              Cancel
+            </button>
+            <button
+              class="dialog-btn dialog-btn-confirm"
+              :disabled="!isJsonValid || !customJson.trim()"
+              @click="handleOk"
+            >
+              OK
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -162,7 +218,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
+import { favoritesAPI } from '@/services/api'
 
 const props = defineProps({
   isRunning: {
@@ -196,6 +254,10 @@ const props = defineProps({
   customNotification: {
     type: Object,
     default: null
+  },
+  protocol: {
+    type: String,
+    default: 'gemini'
   }
 })
 
@@ -204,6 +266,17 @@ const emit = defineEmits(['runAll', 'runTest', 'update:timeout', 'update:vendor'
 // Custom dialog state
 const showCustomDialog = ref(false)
 const customJson = ref('')
+
+// Favorites state
+const showFavoriteInput = ref(false)
+const favoriteName = ref('')
+const favorites = ref([])
+const showFavoriteInputError = ref(false)
+
+// Selected tests state
+const selectedTests = ref(new Set())
+const selectedFavoriteId = ref(null)
+const editingFavoriteId = ref(null)
 
 // Computed: Check if JSON is valid
 const isJsonValid = computed(() => {
@@ -214,6 +287,12 @@ const isJsonValid = computed(() => {
   } catch {
     return false
   }
+})
+
+// Computed: Check if all tests are selected
+const isAllSelected = computed(() => {
+  const allTestTypes = tests.value.map(t => t.type)
+  return allTestTypes.length > 0 && allTestTypes.every(type => selectedTests.value.has(type))
 })
 
 // Test types with icons and descriptions - computed based on activeTab
@@ -244,9 +323,70 @@ const validateJson = () => {
 
 // Handle run all tests
 const handleRunAll = () => {
+  // 获取所有选中的测试类型
+  const selectedTestTypes = Array.from(selectedTests.value)
   const customJsonContent = customJson.value.trim()
   const customJsonParsed = isJsonValid.value && customJsonContent ? JSON.parse(customJsonContent) : null
-  emit('runAll', customJsonParsed)
+
+  // 如果有选中的收藏，使用收藏的 body
+  let finalCustomJson = customJsonParsed
+  if (selectedFavoriteId.value !== null && customJsonParsed) {
+    finalCustomJson = customJsonParsed
+  }
+
+  // 如果没有选中任何测试，提示用户
+  if (selectedTestTypes.length === 0 && selectedFavoriteId.value === null) {
+    alert('请先选择要测试的项目')
+    return
+  }
+
+  // 运行选中的测试
+  emit('runAll', {
+    selectedTests: selectedTestTypes,
+    selectedFavoriteId: selectedFavoriteId.value,
+    customJson: finalCustomJson
+  })
+}
+
+// Toggle test selection
+const toggleTestSelection = (testType) => {
+  if (selectedTests.value.has(testType)) {
+    selectedTests.value.delete(testType)
+  } else {
+    selectedTests.value.add(testType)
+  }
+}
+
+// Toggle select all
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    // 取消全选
+    selectedTests.value.clear()
+    selectedFavoriteId.value = null
+  } else {
+    // 全选所有测试
+    tests.value.forEach(test => selectedTests.value.add(test.type))
+  }
+}
+
+// Handle favorite click - select and run
+const handleFavoriteClick = (fav) => {
+  // 如果已选中，取消选中
+  if (selectedFavoriteId.value === fav.id) {
+    selectedFavoriteId.value = null
+  } else {
+    selectedFavoriteId.value = fav.id
+  }
+}
+
+// Edit favorite - open dialog
+const editFavorite = (fav) => {
+  editingFavoriteId.value = fav.id
+  favoriteName.value = fav.name
+  customJson.value = fav.body_content
+  showFavoriteInput.value = true
+  showFavoriteInputError.value = false
+  showCustomDialog.value = true
 }
 
 // Handle run individual test
@@ -256,14 +396,12 @@ const handleRunTest = (testType) => {
 
 // Open custom dialog
 const openCustomDialog = () => {
+  editingFavoriteId.value = null
+  favoriteName.value = ''
+  customJson.value = ''
+  showFavoriteInput.value = false
+  showFavoriteInputError.value = false
   showCustomDialog.value = true
-}
-
-// Handle custom test
-const runCustomTest = () => {
-  emit('runCustom', JSON.parse(customJson.value))
-  // Close dialog but keep the content for future use
-  showCustomDialog.value = false
 }
 
 // Handle timeout update
@@ -287,7 +425,148 @@ const handleNodeGroupUpdate = (event) => {
 // Close custom dialog
 const closeCustomDialog = () => {
   showCustomDialog.value = false
-  customJson.value = ''
+  showFavoriteInput.value = false
+  favoriteName.value = ''
+  editingFavoriteId.value = null
+  showFavoriteInputError.value = false
+}
+
+// Load favorites on mount
+onMounted(async () => {
+  try {
+    favorites.value = await favoritesAPI.getFavorites(props.protocol)
+  } catch (error) {
+    console.error('Failed to load favorites:', error)
+  }
+})
+
+// Watch for protocol changes
+watch(() => props.protocol, async (newProtocol) => {
+  try {
+    favorites.value = await favoritesAPI.getFavorites(newProtocol)
+  } catch (error) {
+    console.error('Failed to load favorites:', error)
+  }
+})
+
+// Watch for tab changes - clear selections when tab changes
+watch(() => props.activeTab, () => {
+  selectedTests.value.clear()
+})
+
+// Toggle favorite input
+const toggleFavoriteInput = () => {
+  showFavoriteInput.value = !showFavoriteInput.value
+  if (showFavoriteInput.value) {
+    setTimeout(() => {
+      const input = document.querySelector('.favorite-input')
+      if (input) input.focus()
+    }, 100)
+  }
+}
+
+// Save favorite
+const saveFavorite = async () => {
+  if (!favoriteName.value.trim() || !isJsonValid.value || !customJson.value.trim()) {
+    if (!favoriteName.value.trim()) {
+      showFavoriteInputError.value = true
+    }
+    return
+  }
+
+  // Check for duplicate name (excluding current favorite when editing)
+  const duplicate = favorites.value.find(f =>
+    f.name === favoriteName.value.trim() && f.id !== editingFavoriteId.value
+  )
+  if (duplicate) {
+    alert(`收藏名称 "${favoriteName.value}" 已存在，请使用其他名称`)
+    showFavoriteInputError.value = true
+    return
+  }
+
+  try {
+    if (editingFavoriteId.value) {
+      // 更新现有收藏
+      const updatedFavorite = await favoritesAPI.updateFavorite(
+        editingFavoriteId.value,
+        favoriteName.value,
+        customJson.value
+      )
+      const index = favorites.value.findIndex(f => f.id === editingFavoriteId.value)
+      if (index !== -1) {
+        favorites.value[index] = updatedFavorite
+      }
+    } else {
+      // 创建新收藏
+      const newFavorite = await favoritesAPI.createFavorite(
+        props.protocol,
+        favoriteName.value,
+        customJson.value
+      )
+      favorites.value.push(newFavorite)
+    }
+    showFavoriteInput.value = false
+    favoriteName.value = ''
+    editingFavoriteId.value = null
+    showFavoriteInputError.value = false
+  } catch (error) {
+    console.error('Failed to save favorite:', error)
+    const errorMsg = error.message || ''
+    if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
+      alert('收藏名称已存在，请使用其他名称')
+    } else {
+      alert(editingFavoriteId.value ? '更新失败，请重试' : '保存失败，请重试')
+    }
+  }
+}
+
+// Handle OK button click (save only, don't send)
+const handleOk = async () => {
+  // If favorite input is shown, validate that name is provided
+  if (showFavoriteInput.value) {
+    if (!favoriteName.value.trim()) {
+      showFavoriteInputError.value = true
+      return
+    }
+    if (editingFavoriteId.value) {
+      await saveFavorite()
+    } else {
+      await saveFavorite()
+    }
+  }
+  // Just close dialog, don't run test
+  showCustomDialog.value = false
+}
+
+// Delete favorite
+const deleteFavorite = async (id) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除这个收藏吗？',
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--primary',
+        cancelButtonClass: 'el-button--default'
+      }
+    )
+
+    await favoritesAPI.deleteFavorite(id)
+    favorites.value = favorites.value.filter(f => f.id !== id)
+    // Clear selection if deleted favorite was selected
+    if (selectedFavoriteId.value === id) {
+      selectedFavoriteId.value = null
+    }
+    // Close the edit dialog after deletion
+    closeCustomDialog()
+  } catch (error) {
+    // User cancelled or error occurred
+    if (error !== 'cancel') {
+      console.error('Failed to delete favorite:', error)
+    }
+  }
 }
 
 // Watch for custom dialog opening
@@ -330,6 +609,28 @@ watch(showCustomDialog, (isOpen) => {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+/* Select All Button */
+.select-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.select-all-btn:hover {
+  background: var(--glow-blue);
+  border-color: var(--accent-active);
+  color: var(--text);
 }
 
 /* Run All Button */
@@ -500,7 +801,7 @@ watch(showCustomDialog, (isOpen) => {
   border-radius: 10px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  font-weight: 500;
+  font-weight:  500;
   color: var(--text-dim);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -545,6 +846,24 @@ watch(showCustomDialog, (isOpen) => {
   color: var(--text);
 }
 
+.test-btn.selected {
+  border-color: var(--accent-gemini);
+  background: rgba(255, 167, 38, 0.15);
+  color: var(--accent-gemini);
+  box-shadow: 0 0 0 3px rgba(255, 167, 38, 0.3);
+}
+
+.test-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 12px;
+  font-weight:  700;
+  color: var(--accent-gemini);
+  z-index: 2;
+}
+
+/* Custom Button */
 .test-btn-custom {
   border-style: dashed;
   border-color: var(--accent-active);
@@ -565,12 +884,18 @@ watch(showCustomDialog, (isOpen) => {
   animation: spinDashed 1s linear infinite;
 }
 
+.test-btn-custom.selected {
+  border-color: var(--accent-gemini);
+  background: rgba(255, 167, 38, 0.15);
+  color: var(--accent-gemini);
+}
+
 @keyframes spinDashed {
   0% {
     border-color: var(--accent-active);
     box-shadow: 0 0 5px var(--glow-blue);
   }
-  25% {
+   25% {
     border-color: var(--accent-gemini);
   }
   50% {
@@ -586,7 +911,6 @@ watch(showCustomDialog, (isOpen) => {
   }
 }
 
-/* Add a pulsing glow effect */
 .test-btn-custom.running::before {
   content: '';
   position: absolute;
@@ -630,6 +954,31 @@ watch(showCustomDialog, (isOpen) => {
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   flex-shrink: 0;
+}
+
+/* Favorite Button Style */
+.test-btn-favorite {
+  border: 1px solid var(--accent-active);
+  color: var(--accent-active);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.test-btn-favorite:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: var(--accent-active);
+}
+
+.test-btn-favorite.selected {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--accent-active);
+  color: var(--accent-active);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+.test-btn-favorite.running {
+  border-color: var(--accent-active);
+  background: var(--glow-blue);
+  color: var(--text);
 }
 
 /* Quick Config Section */
@@ -800,10 +1149,22 @@ watch(showCustomDialog, (isOpen) => {
 
 .dialog-footer {
   display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding: 16px 20px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
   border-top: 1px solid var(--border);
+}
+
+.footer-left {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.footer-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .dialog-btn {
@@ -836,6 +1197,68 @@ watch(showCustomDialog, (isOpen) => {
 .dialog-btn-confirm:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Favorite Button */
+.dialog-btn-favorite {
+  background: var(--accent-gemini);
+  border: none;
+  color: var(--bg);
+  margin-right: auto;
+}
+
+.dialog-btn-delete {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.dialog-btn-delete:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.favorite-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  margin-right: 12px;
+  min-width: 150px;
+  max-width: 200px;
+  height: 38px;
+}
+
+.favorite-input:focus {
+  border-color: var(--accent-active);
+  box-shadow: 0 0 0 3px var(--glow-blue);
+}
+
+.favorite-input-error {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+}
+
+.favorite-input-error:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3) !important;
+}
+
+.favorite-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.favorite-error-text {
+  color: var(--error);
+  font-size: 10px;
+  margin-top: 2px;
+  margin-bottom: 0;
+  white-space: nowrap;
 }
 
 /* Custom test notification */

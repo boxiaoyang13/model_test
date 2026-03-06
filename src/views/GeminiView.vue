@@ -36,6 +36,7 @@
           :nodeGroup="nodeGroup"
           :activeTab="activeTab"
           :customNotification="testRunner.testState.customNotification"
+          :protocol="'gemini'"
           @runAll="handleRunAll"
           @runTest="handleRunTest"
           @runCustom="handleRunCustom"
@@ -131,7 +132,7 @@ const handleTabChange = (tab) => {
 }
 
 // Handle run all tests
-const handleRunAll = async (customJson = null) => {
+const handleRunAll = async (params = null) => {
   const activeTab = configPanelRef.value?.getActiveTab() || 'text'
   const models = selectedModels[activeTab]
 
@@ -153,7 +154,18 @@ const handleRunAll = async (customJson = null) => {
     nodeGroup: nodeGroup.value
   }
 
-  await testRunner.runAllTests(testConfig, models, activeTab, customJson)
+  // 处理新的参数格式
+  let customJson = null
+  let selectedTests = null
+
+  if (params && typeof params === 'object') {
+    selectedTests = params.selectedTests || null
+    customJson = params.customJson || null
+  } else {
+    customJson = params // 兼容旧格式
+  }
+
+  await testRunner.runAllTests(testConfig, models, activeTab, customJson, selectedTests)
 }
 
 // Handle run individual test
