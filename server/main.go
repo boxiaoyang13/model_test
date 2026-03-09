@@ -64,8 +64,14 @@ func main() {
 	// Setup handlers
 	favoritesHandler := handlers.NewFavoritesHandler()
 
+	// Setup WebSocket Hub
+	wsHub := handlers.NewWebSocketHub()
+	go wsHub.Run()
+
+	proxyHandler := handlers.NewProxyHandler(wsHub)
+
 	// Setup routes
-	routes.SetupRoutes(r, favoritesHandler)
+	routes.SetupRoutes(r, favoritesHandler, proxyHandler, wsHub)
 
 	// 启动服务器
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)

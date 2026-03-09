@@ -1,4 +1,5 @@
 import { reactive } from 'vue'
+import { proxyAPI } from '@/services/api'
 
 export function useOpenAI() {
   const state = reactive({
@@ -10,66 +11,19 @@ export function useOpenAI() {
   const sendChat = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/chat/completions`
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      // Check if payload is already a complete request body (custom JSON format)
-      // or just a prompt object
-      let requestBody
-
-      if (payload.model && payload.messages) {
-        // Custom JSON format - use directly as request body
-        requestBody = payload
-      } else {
-        // Standard prompt format - build request body
+      // Build standard request if needed
+      if (!payload.model || !payload.messages) {
         requestBody = {
-          model,
+          model: config.model,
           messages: [{ role: 'user', content: payload.prompt }]
         }
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
+      state.response = await proxyAPI.openai.chat(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -82,106 +36,22 @@ export function useOpenAI() {
   const sendChatStream = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/chat/completions`
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      // Check if payload is already a complete request body (custom JSON format)
-      // or just a prompt object
-      let requestBody
-
-      if (payload.model && payload.messages) {
-        // Custom JSON format - use directly as request body, ensure stream is true
-        requestBody = { ...payload, stream: true }
-      } else {
-        // Standard prompt format - build request body
+      // Build standard request if needed, ensure stream is true
+      if (!payload.model || !payload.messages) {
         requestBody = {
-          model,
+          model: config.model,
           messages: [{ role: 'user', content: payload.prompt }],
           stream: true
         }
+      } else {
+        requestBody = { ...payload, stream: true }
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const chunks = []
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let hasDeltaContent = false
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        buffer += chunk
-
-        // Process SSE format (data: {...})
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (trimmed.startsWith('data:')) {
-            const jsonStr = trimmed.slice(5).trim()
-            if (jsonStr && jsonStr !== '[DONE]') {
-              try {
-                const data = JSON.parse(jsonStr)
-                chunks.push(data)
-                // Check if delta has content
-                if (data.choices?.[0]?.delta?.content && data.choices[0].delta.content.length > 0) {
-                  hasDeltaContent = true
-                }
-              } catch (e) {
-                // Skip invalid JSON
-              }
-            }
-          }
-        }
-      }
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data: {
-          chunks,
-          chunkCount: chunks.length,
-          hasDeltaContent
-        },
-        duration
-      }
-
+      state.response = await proxyAPI.openai.stream(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -194,39 +64,14 @@ export function useOpenAI() {
   const runReasoning = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/chat/completions`
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      // Check if payload is already a complete request body (custom JSON format)
-      // or just a prompt object
-      let requestBody
-
-      if (payload.model && payload.messages) {
-        // Custom JSON format - use directly as request body
-        requestBody = payload
-      } else {
-        // Standard prompt format - build request body
+      // Build standard reasoning request if needed
+      if (!payload.model || !payload.messages) {
         requestBody = {
-          model,
+          model: config.model,
           messages: [{
             role: 'user',
             content: payload.prompt || 'Jane, 54 years old'
@@ -236,29 +81,7 @@ export function useOpenAI() {
         }
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
+      state.response = await proxyAPI.openai.chat(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -271,28 +94,8 @@ export function useOpenAI() {
   const runFunctionCall = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/chat/completions`
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
       // Define tools for function calling
       const tools = [
         {
@@ -318,17 +121,12 @@ export function useOpenAI() {
         }
       ]
 
-      // Check if payload is already a complete request body (custom JSON format)
-      // or just a prompt object
-      let requestBody
+      let requestBody = payload
 
-      if (payload.model && payload.messages) {
-        // Custom JSON format - use directly as request body
-        requestBody = payload
-      } else {
-        // Standard prompt format - build request body
+      // Build standard function call request if needed
+      if (!payload.model || !payload.messages) {
         requestBody = {
-          model,
+          model: config.model,
           messages: [{
             role: 'user',
             content: payload.prompt || "What's the weather like in Boston today?"
@@ -338,29 +136,7 @@ export function useOpenAI() {
         }
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
+      state.response = await proxyAPI.openai.chat(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -373,68 +149,21 @@ export function useOpenAI() {
   const sendImageGen = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/v1/images/generations`
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      // Check if payload is already a complete request body (custom JSON format)
-      // or just a prompt object
-      let requestBody
-
+      // Build standard image generation request if needed
       if (payload.prompt !== undefined && !payload.model) {
-        // Standard prompt format - build request body
         requestBody = {
-          model: model || 'gpt-image-1',
+          model: config.model || 'gpt-image-1',
           prompt: payload.prompt,
           n: 1,
           size: payload.size || '1024x1024'
         }
-      } else {
-        // Custom JSON format - use directly as request body
-        requestBody = payload
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
+      state.response = await proxyAPI.openai.image(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -447,115 +176,62 @@ export function useOpenAI() {
   const sendVideoGen = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const submitUrl = `${baseUrl}/v1/videos`
+      // Build request body for video generation
+      let requestBody = payload
 
-      // Step 1: Submit video generation request using multipart/form-data
-      const formData = new FormData()
-
-      // Add vendor header if provided (for FormData, we can't set Content-Type)
-      const headers = {
-        'Authorization': `Bearer ${apiKey}`
+      if (!payload.model) {
+        requestBody = {
+          model: config.model || 'sora-2',
+          prompt: payload.prompt,
+          seconds: payload.seconds || 4,
+          size: payload.size
+        }
       }
 
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      // Build form data from payload
-      if (payload.model) {
-        formData.append('model', payload.model)
-      } else {
-        formData.append('model', model || 'sora-2')
-      }
-
-      if (payload.prompt) {
-        formData.append('prompt', payload.prompt)
-      }
-
-      if (payload.seconds !== undefined) {
-        formData.append('seconds', String(payload.seconds))
-      } else {
-        formData.append('seconds', '4')
-      }
-
-      if (payload.size) {
-        formData.append('size', payload.size)
-      }
-
-      const submitResponse = await fetch(submitUrl, {
-        method: 'POST',
-        headers,
-        body: formData
-      })
-
-      if (!submitResponse.ok) {
-        const error = new Error(`HTTP ${submitResponse.status}: ${submitResponse.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const submitData = await submitResponse.json()
-      const videoId = submitData.id
+      // Submit video generation request
+      const submitResult = await proxyAPI.openai.video(config, requestBody)
+      const videoId = submitResult.data?.id
 
       if (!videoId) {
         throw new Error('Failed to get video ID from response')
       }
 
-      // Step 2: Poll the video status
-      let pollingResult = submitData
+      // Poll for completion
+      let pollingResult = submitResult.data
       let attempts = 0
-      const maxAttempts = 120 // Poll for up to 2 minutes (1 second intervals)
-      const pollInterval = 1000 // 1 second
+      const maxAttempts = 120
+      const pollInterval = 1000
 
-      while (pollingResult.status !== 'completed' && pollingResult.status !== 'failed' && attempts < maxAttempts) {
+      while (pollingResult?.status !== 'completed' && pollingResult?.status !== 'failed' && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, pollInterval))
 
-        const pollResponse = await fetch(`${baseUrl}/v1/videos/${videoId}`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          }
-        })
+        pollingResult = await proxyAPI.openai.videoStatus(config, videoId)
+        pollingResult = pollingResult.data
 
-        if (!pollResponse.ok) {
-          throw new Error(`HTTP ${pollResponse.status}: ${pollResponse.statusText} while polling`)
-        }
-
-        pollingResult = await pollResponse.json()
         attempts++
       }
 
-      const duration = Date.now() - startTime
-
-      if (pollingResult.status !== 'completed') {
-        throw new Error(`Video generation ${pollingResult.status || 'timeout'}`)
+      if (pollingResult?.status !== 'completed') {
+        throw new Error(`Video generation ${pollingResult?.status || 'timeout'}`)
       }
 
-      // Return success response with video ID for download
       state.response = {
         status: 200,
         statusText: 'OK',
         headers: {},
         data: {
           videoId: videoId,
-          downloadUrl: `${baseUrl}/v1/videos/${videoId}/content`,
+          downloadUrl: `${config.baseUrl}/v1/videos/${videoId}/content`,
           status: pollingResult.status,
           progress: pollingResult.progress,
           seconds: pollingResult.seconds,
           size: pollingResult.size,
           model: pollingResult.model,
-          duration
+          duration: submitResult.duration + (pollingResult.duration || 0)
         },
-        duration
+        duration: submitResult.duration + (pollingResult.duration || 0)
       }
 
       return state.response
@@ -567,23 +243,13 @@ export function useOpenAI() {
     }
   }
 
-  const downloadVideo = async (videoUrl, apiKey) => {
+  const downloadVideo = async (config, videoId) => {
     state.loading = true
     state.error = null
 
     try {
-      const response = await fetch(videoUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to download video: HTTP ${response.status}`)
-      }
-
-      const blob = await response.blob()
+      const result = await proxyAPI.openai.videoDownload(config, videoId)
+      const blob = result.data
       const url = window.URL.createObjectURL(blob)
 
       // Create download link

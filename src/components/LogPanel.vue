@@ -4,11 +4,13 @@
     <div class="log-header">
       <div class="header-left">
         <h3 class="log-title">Logs</h3>
-        <span class="log-count">{{ logCount }} entries</span>
+        <span class="log-count">{{ displayLogCount }} entries</span>
+        <span v-if="wsConnected" class="connection-status connected">● Live</span>
+        <span v-else class="connection-status disconnected">● Offline</span>
       </div>
       <button
         class="clear-btn"
-        :disabled="logs.length === 0"
+        :disabled="displayLogs.length === 0"
         @click="handleClear"
         aria-label="Clear logs"
       >
@@ -20,7 +22,7 @@
     <!-- Log Body -->
     <div class="log-body" ref="logBodyRef">
       <!-- Empty State -->
-      <div v-if="logs.length === 0" class="empty-state">
+      <div v-if="displayLogs.length === 0" class="empty-state">
         <div class="empty-icon">📋</div>
         <p class="empty-text">No logs yet</p>
         <p class="empty-hint">Run a test to see logs here</p>
@@ -29,7 +31,7 @@
       <!-- Log Entries -->
       <div v-else class="log-entries">
         <div
-          v-for="log in logs"
+          v-for="log in displayLogs"
           :key="log.id"
           class="log-entry"
           :class="`log-entry--${log.type}`"
@@ -104,12 +106,13 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 
 const props = defineProps({
+  // Keep backward compatibility - can still receive logs via props
   logs: {
     type: Array,
-    required: true,
+    required: false,
     default: () => []
   },
   logCount: {
@@ -127,6 +130,11 @@ const props = defineProps({
   downloadVideo: {
     type: Function,
     default: null
+  },
+  // WebSocket server URL
+  wsUrl: {
+    type: String,
+    default: 'ws://127.0.0.1:8080/api/ws'
   }
 })
 
@@ -138,8 +146,99 @@ const expandedVideo = ref(null)
 const isVideoExpanded = ref(false)
 const videoBlobUrl = ref(null)
 
+// WebSocket connection
+const ws = ref(null)
+const wsConnected = ref(false)
+const internalLogs = ref([])
+const logIdCounter = ref(0)
+
+// Use internal logs from WebSocket, fallback to props logs
+const displayLogs = computed(() => {
+  return internalLogs.value.length > 0 ? internalLogs.value : props.logs
+})
+
+const displayLogCount = computed(() => {
+  return internalLogs.value.length > 0 ? internalLogs.value.length : props.logCount
+})
+
+// Connect to WebSocket
+const connectWebSocket = () => {
+  try {
+    ws.value = new WebSocket(props.wsUrl)
+
+    ws.value.onopen = () => {
+      console.log('WebSocket connected')
+      wsConnected.value = true
+    }
+
+    ws.value.onmessage = (event) => {
+      try {
+        const logMessage = JSON.parse(event.data)
+        addLog(logMessage)
+      } catch (err) {
+        console.error('Failed to parse WebSocket message:', err)
+      }
+    }
+
+    ws.value.onclose = () => {
+      console.log('WebSocket disconnected')
+      wsConnected.value = false
+      // Attempt to reconnect after 3 seconds
+      setTimeout(() => {
+        if (!wsConnected.value) {
+          connectWebSocket()
+        }
+      }, 3000)
+    }
+
+    ws.value.onerror = (err) => {
+      console.error('WebSocket error:', err)
+    }
+  } catch (err) {
+    console.error('Failed to connect to WebSocket:', err)
+  }
+}
+
+// Disconnect WebSocket
+const disconnectWebSocket = () => {
+  if (ws.value) {
+    ws.value.close()
+    ws.value = null
+    wsConnected.value = false
+  }
+}
+
+// Add log from WebSocket
+const addLog = (logMessage) => {
+  const logEntry = {
+    id: logIdCounter.value++,
+    type: logMessage.type || 'info',
+    tag: logMessage.tag || 'LOG',
+    content: logMessage.content,
+    timestamp: logMessage.timestamp || Date.now(),
+    model: logMessage.model || null
+  }
+
+  internalLogs.value.push(logEntry)
+
+  // Keep only last 1000 logs to prevent memory issues
+  if (internalLogs.value.length > 1000) {
+    internalLogs.value = internalLogs.value.slice(-1000)
+  }
+}
+
+// Lifecycle hooks
+onMounted(() => {
+  connectWebSocket()
+})
+
+onUnmounted(() => {
+  disconnectWebSocket()
+})
+
 // Handle clear button click
 const handleClear = () => {
+  internalLogs.value = []
   emit('clear')
 }
 
@@ -269,22 +368,58 @@ const expandVideo = async (videoUrl) => {
   // Download video for preview if API key is available
   if (props.apiKey) {
     try {
-      const response = await fetch(videoUrl, {
-        method: 'GET',
-        headers: {
-          'x-goog-api-key': props.apiKey
-        }
+      // Use backend proxy for video download
+      const response = await fetch('http://127.0.0.1:8080/api/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: videoUrl,
+          method: 'GET',
+          headers: {
+            'x-goog-api-key': props.apiKey
+          },
+          body: null
+        })
       })
 
       if (response.ok) {
-        const blob = await response.blob()
-        videoBlobUrl.value = window.URL.createObjectURL(blob)
+        const result = await response.json()
+        // The proxy returns the response data in result.data
+        // For binary data like video, we need to handle it differently
+        // Let's fetch the video directly through the proxy
+        const blobResponse = await fetch(videoUrl, {
+          method: 'GET',
+          headers: {
+            'x-goog-api-key': props.apiKey
+          }
+        })
+
+        if (blobResponse.ok) {
+          const blob = await blobResponse.blob()
+          videoBlobUrl.value = window.URL.createObjectURL(blob)
+        }
       } else {
         throw new Error(`HTTP ${response.status}`)
       }
     } catch (err) {
       console.error('Failed to load video for preview:', err)
-      alert(`Failed to load video for preview: ${err.message}`)
+      // Fallback: try direct fetch
+      try {
+        const response = await fetch(videoUrl, {
+          method: 'GET',
+          headers: {
+            'x-goog-api-key': props.apiKey
+          }
+        })
+
+        if (response.ok) {
+          const blob = await response.blob()
+          videoBlobUrl.value = window.URL.createObjectURL(blob)
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr)
+        alert(`Failed to load video for preview: ${err.message}`)
+      }
     }
   }
 }
@@ -322,7 +457,7 @@ const scrollToBottom = () => {
 }
 
 // Watch for changes in logs and auto-scroll
-watch(() => props.logs, () => {
+watch(() => displayLogs.value, () => {
   scrollToBottom()
 }, { deep: true })
 </script>
@@ -366,6 +501,33 @@ watch(() => props.logs, () => {
   background: var(--surface2);
   padding: 4px 10px;
   border-radius: 12px;
+}
+
+.connection-status {
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.connection-status.connected {
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.15);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.connection-status.disconnected {
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.15);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .clear-btn {

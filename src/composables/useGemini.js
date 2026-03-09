@@ -1,4 +1,7 @@
 import { reactive } from 'vue'
+import { proxyAPI } from '@/services/api'
+
+const API_BASE_URL = 'http://127.0.0.1:8080/api'
 
 export function useGemini() {
   const state = reactive({
@@ -10,40 +13,13 @@ export function useGemini() {
   const sendChat = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
+      // Build request body based on payload format
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-goog-api-key': apiKey
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      // Check if payload is already a complete request body (custom JSON format)
-      // or just a prompt object
-      let requestBody
-
-      if (payload.contents) {
-        // Custom JSON format (chat/image) - use directly as request body
-        requestBody = payload
-      } else if (payload.instances) {
-        // Custom JSON format (video) - use directly as request body
-        requestBody = payload
-      } else if (payload.prompt) {
-        // Standard prompt format - build request body
+      // If payload contains prompt (not custom JSON format), build standard request
+      if (payload.prompt && !payload.contents) {
         requestBody = {
           contents: [{
             role: 'user',
@@ -54,34 +30,9 @@ export function useGemini() {
             maxOutputTokens: payload.maxTokens || 1024
           }
         }
-      } else {
-        // Fallback - use payload directly
-        requestBody = payload
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
+      state.response = await proxyAPI.gemini.chat(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -94,32 +45,13 @@ export function useGemini() {
   const sendChatStream = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse`
+      // Build request body
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-goog-api-key': apiKey
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      if (payload.prompt && !payload.contents) {
+        requestBody = {
           contents: [{
             role: 'user',
             parts: [{ text: payload.prompt }]
@@ -128,66 +60,10 @@ export function useGemini() {
             temperature: payload.temperature || 0.7,
             maxOutputTokens: payload.maxTokens || 1024
           }
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const duration = Date.now() - startTime
-      const chunks = []
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let hasContent = false
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        buffer += chunk
-
-        // Process SSE format (data: {...})
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (trimmed.startsWith('data:')) {
-            const jsonStr = trimmed.slice(5).trim()
-            if (jsonStr && jsonStr !== '[DONE]') {
-              try {
-                const data = JSON.parse(jsonStr)
-                chunks.push(data)
-                // Check if there's actual content in the response
-                if (data.candidates && data.candidates[0]?.content?.parts) {
-                  hasContent = true
-                }
-              } catch (e) {
-                // Skip invalid JSON
-              }
-            }
-          }
         }
       }
 
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data: {
-          chunks,
-          chunkCount: chunks.length,
-          hasContent,
-          isSSE: true
-        },
-        duration
-      }
-
+      state.response = await proxyAPI.gemini.stream(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -200,32 +76,13 @@ export function useGemini() {
   const runReasoning = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-goog-api-key': apiKey
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      // Build standard reasoning request if needed
+      if (payload.prompt && !payload.contents) {
+        requestBody = {
           contents: [{
             parts: [{ text: payload.prompt }]
           }],
@@ -236,26 +93,10 @@ export function useGemini() {
               thinkingLevel: 'high'
             }
           }
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
+        }
       }
 
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
+      state.response = await proxyAPI.gemini.chat(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -268,29 +109,9 @@ export function useGemini() {
   const runFunctionCall = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-goog-api-key': apiKey
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      // Define function declarations for scheduling meeting
+      // Define function declarations
       const functionDeclarations = [
         {
           name: 'schedule_meeting',
@@ -321,10 +142,11 @@ export function useGemini() {
         }
       ]
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      let requestBody = payload
+
+      // Build standard function call request if needed
+      if (payload.prompt && !payload.contents) {
+        requestBody = {
           contents: [{
             role: 'user',
             parts: [{ text: payload.prompt }]
@@ -336,26 +158,10 @@ export function useGemini() {
             temperature: payload.temperature || 0.7,
             maxOutputTokens: payload.maxTokens || 1024
           }
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
+        }
       }
 
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
+      state.response = await proxyAPI.gemini.chat(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -368,32 +174,13 @@ export function useGemini() {
   const sendImageGen = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/v1beta/models/${model}:generateContent`
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-goog-api-key': apiKey
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      // Build standard image generation request if needed
+      if (payload.prompt && !payload.contents) {
+        requestBody = {
           contents: [{
             role: 'user',
             parts: [{ text: payload.prompt }]
@@ -404,26 +191,10 @@ export function useGemini() {
               imageSize: payload.imageSize || '1K'
             }
           }
-        })
-      })
-
-      if (!response.ok) {
-        const error = new Error(`HTTP ${response.status}: ${response.statusText}`)
-        state.error = error
-        throw error
+        }
       }
 
-      const duration = Date.now() - startTime
-      const data = await response.json()
-
-      state.response = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        data,
-        duration
-      }
-
+      state.response = await proxyAPI.gemini.image(config, requestBody)
       return state.response
     } catch (err) {
       state.error = err
@@ -436,36 +207,12 @@ export function useGemini() {
   const sendVideoGen = async (config, payload) => {
     state.loading = true
     state.error = null
-    const startTime = Date.now()
 
     try {
-      const { baseUrl, apiKey, model, vendor, nodeGroup } = config
-      const url = `${baseUrl}/v1beta/models/${model}:predictLongRunning`
+      let requestBody = payload
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-goog-api-key': apiKey
-      }
-
-      // Add vendor header if provided
-      if (vendor) {
-        headers['X-Zenlayer-Vendor'] = vendor
-      }
-
-      // Add nodeGroup header if provided
-      if (nodeGroup) {
-        headers['X-Zenlayer-Node-Group'] = nodeGroup
-      }
-
-      // Check if payload is already a complete request body (custom JSON format with instances)
-      // or just parameters object
-      let requestBody
-      if (payload.instances && Array.isArray(payload.instances)) {
-        // Custom JSON format - use directly as request body
-        requestBody = payload
-      } else {
-        // Standard parameters format - build request body
+      // Build standard video generation request if needed
+      if (!payload.instances || !Array.isArray(payload.instances)) {
         requestBody = {
           instances: [{
             prompt: payload.prompt || 'A lone cowboy rides his horse across an open plain at beautiful sunset, soft light, warm colors'
@@ -476,70 +223,41 @@ export function useGemini() {
         }
       }
 
-      // Step 1: Submit the video generation request
-      const submitResponse = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
-      })
+      // Submit video generation request
+      const submitResult = await proxyAPI.gemini.video(config, requestBody)
 
-      if (!submitResponse.ok) {
-        const error = new Error(`HTTP ${submitResponse.status}: ${submitResponse.statusText}`)
-        state.error = error
-        throw error
-      }
-
-      const submitData = await submitResponse.json()
-
-      // Extract operation ID from response name
-      // Format: models/veo-3.0-fast-generate-001/operations/OPERATION_ID
-      const operationName = submitData.name
+      // Extract operation ID from response
+      const operationName = submitResult.data?.name
       const operationId = operationName?.split('/').pop()
 
       if (!operationId) {
         throw new Error('Failed to extract operation ID from response')
       }
 
-      // Step 2: Poll the operation status
-      const pollUrl = `${baseUrl}/v1beta/models/${model}/operations/${operationId}`
-
+      // Poll for completion
       let pollingResult = null
       let attempts = 0
-      const maxAttempts = 120 // Poll for up to 2 minutes (1 second intervals)
-      const pollInterval = 1000 // 1 second
+      const maxAttempts = 120
+      const pollInterval = 1000
 
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, pollInterval))
 
-        const pollResponse = await fetch(pollUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'x-goog-api-key': apiKey
-          }
-        })
+        pollingResult = await proxyAPI.gemini.videoStatus(config, operationId)
 
-        if (!pollResponse.ok) {
-          throw new Error(`HTTP ${pollResponse.status}: ${pollResponse.statusText} while polling`)
-        }
-
-        pollingResult = await pollResponse.json()
-
-        if (pollingResult.done) {
+        if (pollingResult.data?.done) {
           break
         }
 
         attempts++
       }
 
-      const duration = Date.now() - startTime
-
-      if (!pollingResult || !pollingResult.done) {
-        throw new Error('Video generation timeout: operation did not complete within expected time')
+      if (!pollingResult || !pollingResult.data?.done) {
+        throw new Error('Video generation timeout')
       }
 
-      // Check if video generation was successful
-      const videoUri = pollingResult.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
+      // Extract video URI
+      const videoUri = pollingResult.data?.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
 
       if (!videoUri) {
         throw new Error('Video generation failed: No video URI in response')
@@ -552,9 +270,9 @@ export function useGemini() {
         data: {
           operationId,
           videoUri,
-          duration
+          duration: submitResult.duration + (pollingResult.duration || 0)
         },
-        duration
+        duration: submitResult.duration + (pollingResult.duration || 0)
       }
 
       return state.response
@@ -571,11 +289,18 @@ export function useGemini() {
     state.error = null
 
     try {
-      const response = await fetch(videoUrl, {
-        method: 'GET',
-        headers: {
-          'x-goog-api-key': apiKey
-        }
+      // Use backend proxy for video download
+      const response = await fetch(`${API_BASE_URL}/proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: videoUrl,
+          method: 'GET',
+          headers: {
+            'x-goog-api-key': apiKey
+          },
+          body: null
+        })
       })
 
       if (!response.ok) {
